@@ -5,8 +5,7 @@ WIDTH, HEIGHT = 700, 700
 WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 ICON = pygame.image.load('Assets/icon.png')
 BACKGROUND = pygame.image.load('Assets/background.jpg')
-LASER = pygame.transform.scale(pygame.image.load('Assets/laser.png'), 
-                                (11, 32))
+LASER = pygame.image.load('Assets/laser.png')
 CHARACTER_STILL = pygame.image.load('Assets/char_still.png')
 CHARACTER_RIGHT = pygame.image.load('Assets/char_right.png')
 CHARACTER_LEFT = pygame.image.load('Assets/char_left.png')
@@ -91,25 +90,30 @@ class Player():
         """
         return pygame.transform.rotate(self.sprite, rotation)
 
-    def shoot_bullet(self, rotation: float) -> None:
+    def shoot_bullet(self, mx: int, my: int) -> None:
         """Handle the shooting of a bullet"""
         bullet = LASER.get_rect()
-        x, y = self.rect.topleft
+        x, y = self.rect.center
         bullet.center = x, y
-        self.bullets.append(bullet)
+        angle = math.atan2(y - my, x - mx)
+        x_vel = math.cos(angle) * BULL_VEL
+        y_vel = math.sin(angle) * BULL_VEL
+        self.bullets.append((bullet, x_vel, y_vel))
     
     def draw_bullets(self, WINDOW: pygame.surface) -> None:
         """Draws the bullets at their current location
         """
         for bullet in self.bullets:
-            WINDOW.blit(LASER, (bullet.x, bullet.y))
+            bullet[0].x -= bullet[1]
+            bullet[0].y -= bullet[2]
+            WINDOW.blit(LASER, (bullet[0].x, bullet[0].y))
 
 
 def draw_window(char: Player, rotation: float):
     WINDOW.blit(BACKGROUND, (0, 0))
     curr_char = char.get_rotated(rotation)
-    WINDOW.blit(curr_char, (char.rect.x, char.rect.y))
     char.draw_bullets(WINDOW)
+    WINDOW.blit(curr_char, (char.rect.x, char.rect.y))
     pygame.display.update()
 
 
@@ -126,9 +130,9 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_m:
-                    char.shoot_bullet(rotation)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    char.shoot_bullet(mx, my)
         key_pressed = pygame.key.get_pressed()
         char.move(key_pressed)
         draw_window(char, rotation)
