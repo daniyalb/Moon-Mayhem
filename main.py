@@ -1,3 +1,5 @@
+from lib2to3.pygram import python_grammar_no_print_statement
+import py
 import pygame
 import math
 import random
@@ -11,13 +13,16 @@ HEART = pygame.transform.scale(pygame.image.load('Assets/misc/heart.png'), (32, 
 pygame.mixer.init()
 LASER_SOUND = pygame.mixer.Sound('Assets/sounds/laser_sound.wav')
 LASER_SOUND.set_volume(0.2)
+ENEMY_DEATH = pygame.mixer.Sound('Assets/sounds/enemy_death.wav')
 CHARACTER_STILL = pygame.image.load('Assets/character/char_still.png')
 CHARACTER_RIGHT = pygame.image.load('Assets/character/char_right.png')
 CHARACTER_LEFT = pygame.image.load('Assets/character/char_left.png')
 CHAR_DIM = 128
 SPEED = 5
-BULL_VEL = 5
+BULL_VEL = 6
 ENEMY_SPEED = 1
+GREEN = (0, 128, 0)
+RED = (255, 0, 0)
 pygame.display.set_caption("Moon Mayhem 2")
 pygame.display.set_icon(ICON)
 FPS = 60
@@ -109,20 +114,25 @@ class Player():
         LASER_SOUND.play()
         self.bullets.append((bullet, x_vel, y_vel))
 
-    def _handle_bullets(self, bullet) -> None:
+    def _handle_bullets(self, bullet: tuple[pygame.Rect, int, int], 
+                        enemies: list) -> None:
         """Handle bullet collisions
         """
         if bullet[0].x <= 0 or bullet[0].x >= WIDTH or bullet[0].y <= 0 or bullet[0].y >= HEIGHT:
             self.bullets.remove(bullet)
+        for enemy in enemies:
+            if enemy.rect.colliderect(bullet[0]):
+                self.bullets.remove(bullet)
+                enemy.damage()
 
-    def draw_bullets(self, window: pygame.surface) -> None:
+    def draw_bullets(self, window: pygame.surface, enemies: list) -> None:
         """Draws the bullets at their current location
         """
         for bullet in self.bullets:
             bullet[0].x -= bullet[1]
             bullet[0].y -= bullet[2]
             window.blit(LASER, (bullet[0].x, bullet[0].y))
-            self._handle_bullets(bullet)
+            self._handle_bullets(bullet, enemies)
 
     def draw_hearts(self, window: pygame.surface) -> None:
         """Display the hearts representing the player's health
@@ -146,6 +156,10 @@ class Enemy:
          The pygame rectangle for this enemy
     curr_sprite:
          The sprite which is currently selected and is being displayed on the screen
+    facing:
+         A string that represents the direction the enemy sprite is currently facing
+    health:
+         The amount of health, or lives, this enemy has
     """
     # === Private Attributes ===
     # _last_updated:
@@ -158,16 +172,20 @@ class Enemy:
     enemy_sprites: list
     rect: pygame.Rect
     curr_sprite: pygame.Surface
+    facing: str
+    health: int
     _last_updated: int
     _curr_frame_sprite: int
 
-    def __init__(self, char_x: int, char_y: int) -> None:
+    def __init__(self) -> None:
         self._last_updated = 0
         self._curr_frame_sprite = 0
+        self.health = 3
+        self.facing = 'right'
         self.init_sprites()
         self.curr_sprite = self.enemy_sprites[0]
         self.rect = self.curr_sprite.get_rect()
-        self.spawn(char_x, char_y)
+        self.spawn()
 
     def init_sprites(self) -> None:
         """ Initialize the sprite with all of its animations into a list 
@@ -180,7 +198,7 @@ class Enemy:
             sprite = pygame.transform.scale(sprite, (100, 100))
             self.enemy_sprites.append(sprite)
 
-    def spawn(self, char_x: int, char_y: int) -> None:
+    def spawn(self) -> None:
         """ Spawn in this enemy somewhere outside of the viewable screen
         """
         x, y = 0, 0
@@ -200,25 +218,62 @@ class Enemy:
         else:
             self.rect.y -= ENEMY_SPEED
 
+    def damage(self) -> None:
+        """ Register the fact that this enemy was damaged
+        """
+        self.health -= 1
+
+    def draw_health(self, window: pygame.Surface) -> None:
+        x1, y1 = self.rect.bottomleft
+        x1 += 16
+        y1 += 6
+        x2, y2 = self.rect.bottomright
+        x2 -= 16
+        y2 += 6
+
+        if self.health == 2:
+            split = int((x2 - x1) * 0.66)
+            split += x1
+            pygame.draw.line(window, GREEN, (x1, y1), (split, y2), 4)
+            pygame.draw.line(window, RED, (split, y1), (x2, y2), 4)
+        elif self.health == 1:
+            split = int((x2 - x1) * 0.33)
+            split += x1
+            pygame.draw.line(window, GREEN, (x1, y1), (split, y2), 4)
+            pygame.draw.line(window, RED, (split, y1), (x2, y2), 4)
+
     def animate(self, x: int, y: int) -> None:
         """ Animate the enemy by cycling through it's animation as it moves
         """
         now = pygame.time.get_ticks()
+
         if now - self._last_updated > 200:
             self._last_updated = now
             self._curr_frame_sprite = (self._curr_frame_sprite + 1) % len(self.enemy_sprites)
-            self.curr_sprite = self.enemy_sprites[self._curr_frame_sprite]
+            if self.facing == 'right':
+                self.curr_sprite = self.enemy_sprites[self._curr_frame_sprite]
+            else:
+                self.curr_sprite = pygame.transform.flip(self.enemy_sprites[self._curr_frame_sprite], True, False)
+                
+            if x < self.rect.x and self.facing == 'right':
+                self.curr_sprite = pygame.transform.flip(self.curr_sprite, True, False)
+                self.facing = 'left'
+            elif x > self.rect.x and self.facing == 'left':
+                self.curr_sprite = pygame.transform.flip(self.curr_sprite, True, False)
+                self.facing = 'right'
 
 
     # Continue building this class
 
 
-def draw_window(char: Player, rotation: float, enemy: Enemy):
+def draw_window(char: Player, rotation: float, enemies: list):
     WINDOW.blit(BACKGROUND, (0, 0))
     curr_char = char.get_rotated(rotation)
-    char.draw_bullets(WINDOW)
+    char.draw_bullets(WINDOW, enemies)
     WINDOW.blit(curr_char, (char.rect.x, char.rect.y))
-    WINDOW.blit(enemy.curr_sprite, (enemy.rect.x, enemy.rect.y))
+    for enemy in enemies:
+        WINDOW.blit(enemy.curr_sprite, (enemy.rect.x, enemy.rect.y))
+        enemy.draw_health(WINDOW)
     char.draw_hearts(WINDOW)
     pygame.display.update()
 
@@ -227,7 +282,7 @@ def main():
     run = True
     clock = pygame.time.Clock()
     char = Player()
-    enemy = Enemy(char.rect.x, char.rect.y)
+    enemies = [Enemy()]
     pygame.mixer.music.load('Assets/sounds/background_music.wav')
     pygame.mixer.music.play(-1)
     while run:
@@ -241,11 +296,18 @@ def main():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     char.shoot_bullet(mx, my)
+
         key_pressed = pygame.key.get_pressed()
         char.move(key_pressed)
-        enemy.animate(char.rect.x, char.rect.y)
-        enemy.move(char.rect.x, char.rect.y)
-        draw_window(char, rotation, enemy)
+
+        for enemy in enemies:
+            enemy.animate(char.rect.x, char.rect.y)
+            enemy.move(char.rect.x, char.rect.y)
+            if enemy.health == 0:
+                enemies.remove(enemy)
+                ENEMY_DEATH.play()
+
+        draw_window(char, rotation, enemies)
     pygame.quit()
 
 
