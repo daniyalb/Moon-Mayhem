@@ -3,3 +3,4 @@
 
 Game icon credit: http://clipart-library.com/clipart/pcoAg49Ri.htm
 Background photo by Juhani Pelli on Unsplash https://unsplash.com/photos/n2Zf3kdcTZA?utm_source=unsplash&utm_medium=referral&utm_content=creditShareLink
+plyayer_hit.wav sound credit: JDWasabi https://jdwasabi.itch.io/8-bit-16-bit-sound-effects-pack
