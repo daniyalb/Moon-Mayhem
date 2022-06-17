@@ -9,6 +9,31 @@ ENEMY_SPEED = 1
 GREEN = (0, 128, 0)
 RED = (255, 0, 0)
 
+def init_enemy_sprites() -> tuple:
+    worm_sprites = []
+    for i in range(1, 10):
+        sprite = pygame.image.load('Assets/enemies/worm/worm' + str(i) + '.png')
+        sprite = pygame.transform.scale(sprite, (100, 100))
+        worm_sprites.append(sprite)
+
+    hit_sprites = []
+    for i in range(1, 29):
+        sprite = pygame.image.load('Assets/enemies/enemy_hit/' + str(i) +
+                                    '.png')
+        sprite = pygame.transform.scale(sprite, (300, 300))
+        hit_sprites.append(sprite)
+
+    death_sprites = []
+    for i in range(1, 31):
+        sprite = pygame.image.load('Assets/enemies/enemy_death/' + str(i) +
+                                    '.png')
+        sprite = pygame.transform.scale(sprite, (300, 300))
+        death_sprites.append(sprite)
+
+    return (worm_sprites, hit_sprites, death_sprites)
+
+WORM_SPRTIES, HIT_SPRITES, DEATH_SPRITES = init_enemy_sprites()
+
 
 class Enemy:
     """ The enemy class for this game.
@@ -65,18 +90,18 @@ class Enemy:
     curr_sprite: pygame.Surface
     health: int
     play_hit_animation: bool
-    hit_sprites: list[pygame.Surface]
     dead: bool
     remove: bool
-    _enemy_sprites: list
     _facing: str
     _last_updated: int
     _curr_frame_sprite: int
     _curr_hit_sprite: int
     _curr_death_sprite: int
-    _death_sprites: list[pygame.Surface]
     _last_update_hit: int
     _last_update_dead: int
+    _death_sprites: list[pygame.Surface]
+    _enemy_sprites: list[pygame.Surface]
+    _hit_sprites: list[pygame.Surface]
 
     def __init__(self) -> None:
         self._last_updated = 0
@@ -89,32 +114,9 @@ class Enemy:
         self._facing = 'right'
         self.dead = False
         self.remove = False
-        self._init_sprites()
-        self._get_hit_sprites()
-        self._get_death_sprites()
-        self.curr_sprite = self._enemy_sprites[0]
-        self.rect = self.curr_sprite.get_rect()
+        self._hit_sprites = HIT_SPRITES
+        self._death_sprites = DEATH_SPRITES
         self.play_hit_animation = False
-        self.spawn()
-
-    def _get_hit_sprites(self) -> None:
-        """ Initialize the sprites representing the blood when the enemy gets
-        hit as pygame.Surface and place them into a list
-        <self._hit_sprites>
-        """
-        raise NotImplementedError
-
-    def _init_sprites(self) -> None:
-        """ Initialize the sprite with all of its animations into a list
-        <self._enemy_sprites>
-        """
-        raise NotImplementedError
-
-    def _get_death_sprites(self) -> None:
-        """ Initialize the sprites representing the blood when the enemy dies
-        as pygame.Surface and place them into a list <self._death_sprites>
-        """
-        raise NotImplementedError
 
     def spawn(self) -> None:
         """ Spawn in this enemy somewhere outside of the viewable screen
@@ -193,11 +195,11 @@ class Enemy:
                 self._facing = 'right'
 
 
-class Snake(Enemy):
-    """The Enemy class for this game.
+class Worm(Enemy):
+    """The Worm Enemy class for this game.
 
     This class handles the drawing of, spawning in, and health and damage
-    caused by the enemies.
+    caused by this enemy.
 
     === Public Attributes ===
     rect:
@@ -249,51 +251,26 @@ class Snake(Enemy):
     curr_sprite: pygame.Surface
     health: int
     play_hit_animation: bool
-    hit_sprites: list[pygame.Surface]
     dead: bool
     remove: bool
-    _enemy_sprites: list
     _facing: str
     _last_updated: int
     _curr_frame_sprite: int
     _curr_hit_sprite: int
     _curr_death_sprite: int
-    _death_sprites: list[pygame.Surface]
     _last_update_hit: int
     _last_update_dead: int
+    _death_sprites: list[pygame.Surface]
+    _enemy_sprites: list[pygame.Surface]
+    _hit_sprites: list[pygame.Surface]
 
-    def _get_hit_sprites(self) -> None:
-        """ Initialize the sprites representing the blood when the enemy gets
-        hit as pygame.Surface and place them into a list
-        <self._hit_sprites>
-        """
-        self.hit_sprites = []
-        for i in range(1, 29):
-            sprite = pygame.image.load('Assets/enemies/enemy_hit/' + str(i) +
-                                       '.png')
-            sprite = pygame.transform.scale(sprite, (300, 300))
-            self.hit_sprites.append(sprite)
+    def __init__(self) -> None:
+        Enemy.__init__(self)
+        self._enemy_sprites = WORM_SPRTIES
+        self.curr_sprite = self._enemy_sprites[0]
+        self.rect = self.curr_sprite.get_rect()
+        self.spawn()
 
-    def _init_sprites(self) -> None:
-        """ Initialize the sprite with all of its animations into a list
-        <self._enemy_sprites>
-        """
-        self._enemy_sprites = []
-        for i in range(1, 10):
-            sprite = pygame.image.load('Assets/enemies/worm' + str(i) + '.png')
-            sprite = pygame.transform.scale(sprite, (100, 100))
-            self._enemy_sprites.append(sprite)
-
-    def _get_death_sprites(self) -> None:
-        """ Initialize the sprites representing the blood when the enemy dies
-        as pygame.Surface and place them into a list <self._death_sprites>
-        """
-        self._death_sprites = []
-        for i in range(1, 31):
-            sprite = pygame.image.load('Assets/enemies/enemy_death/' + str(i) +
-                                       '.png')
-            sprite = pygame.transform.scale(sprite, (300, 300))
-            self._death_sprites.append(sprite)
 
     def hit_animation(self, window: pygame.Surface) -> None:
         now = pygame.time.get_ticks()
@@ -301,12 +278,12 @@ class Snake(Enemy):
         if now - self._last_update_hit > 25:
             self._last_update_hit = now
             self._curr_hit_sprite = (self._curr_hit_sprite + 1) % len(
-                self.hit_sprites)
+                self._hit_sprites)
 
         x, y = self.rect.topleft
         x -= 80
         y -= 80
-        window.blit(self.hit_sprites[self._curr_hit_sprite], (x, y))
+        window.blit(self._hit_sprites[self._curr_hit_sprite], (x, y))
 
         if self._curr_hit_sprite == 27:
             self.play_hit_animation = False
