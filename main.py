@@ -1,6 +1,6 @@
 import pygame
 import math
-from enemy import Worm
+from enemy import Worm, Bat
 
 pygame.init()
 WIDTH, HEIGHT = 1280, 720
@@ -255,7 +255,7 @@ def main():
     run = True
     clock = pygame.time.Clock()
     char = Player()
-    enemies = [Worm(), Worm()]
+    enemies = [Worm(), Worm(), Bat(), Bat()]
     pygame.mixer.music.load('Assets/sounds/background_music.wav')
     pygame.mixer.music.set_volume(0.6)
     pygame.mixer.music.play(-1)

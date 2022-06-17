@@ -16,6 +16,12 @@ def init_enemy_sprites() -> tuple:
         sprite = pygame.transform.scale(sprite, (100, 100))
         worm_sprites.append(sprite)
 
+    bat_sprites = []
+    for i in range(1, 9):
+        sprite = pygame.image.load('Assets/enemies/bat/bat' + str(i) + '.png')
+        sprite = pygame.transform.scale(sprite, (82, 66))
+        bat_sprites.append(sprite)
+
     hit_sprites = []
     for i in range(1, 29):
         sprite = pygame.image.load('Assets/enemies/enemy_hit/' + str(i) +
@@ -30,9 +36,9 @@ def init_enemy_sprites() -> tuple:
         sprite = pygame.transform.scale(sprite, (300, 300))
         death_sprites.append(sprite)
 
-    return (worm_sprites, hit_sprites, death_sprites)
+    return (worm_sprites, bat_sprites, hit_sprites, death_sprites)
 
-WORM_SPRTIES, HIT_SPRITES, DEATH_SPRITES = init_enemy_sprites()
+WORM_SPRITES, BAT_SPRITES, HIT_SPRITES, DEATH_SPRITES = init_enemy_sprites()
 
 
 class Enemy:
@@ -194,6 +200,38 @@ class Enemy:
                                                          False)
                 self._facing = 'right'
 
+    def hit_animation(self, window: pygame.Surface) -> None:
+        now = pygame.time.get_ticks()
+
+        if now - self._last_update_hit > 25:
+            self._last_update_hit = now
+            self._curr_hit_sprite = (self._curr_hit_sprite + 1) % len(
+                self._hit_sprites)
+
+        x, y = self.rect.topleft
+        x -= 80
+        y -= 80
+        window.blit(self._hit_sprites[self._curr_hit_sprite], (x, y))
+
+        if self._curr_hit_sprite == 27:
+            self.play_hit_animation = False
+
+    def death_animation(self, window: pygame.Surface) -> None:
+        now = pygame.time.get_ticks()
+
+        if now - self._last_update_dead > 25:
+            self._last_update_dead = now
+            self._curr_death_sprite = (self._curr_death_sprite + 1) % len(
+                self._death_sprites)
+
+        x, y = self.rect.topleft
+        x -= 60
+        y -= 60
+        window.blit(self._death_sprites[self._curr_death_sprite], (x, y))
+
+        if self._curr_death_sprite == 29:
+            self.remove = True
+
 
 class Worm(Enemy):
     """The Worm Enemy class for this game.
@@ -266,40 +304,84 @@ class Worm(Enemy):
 
     def __init__(self) -> None:
         Enemy.__init__(self)
-        self._enemy_sprites = WORM_SPRTIES
+        self._enemy_sprites = WORM_SPRITES
         self.curr_sprite = self._enemy_sprites[0]
         self.rect = self.curr_sprite.get_rect()
         self.spawn()
 
 
-    def hit_animation(self, window: pygame.Surface) -> None:
-        now = pygame.time.get_ticks()
+class Bat(Enemy):
+    """The Bat Enemy class for this game.
 
-        if now - self._last_update_hit > 25:
-            self._last_update_hit = now
-            self._curr_hit_sprite = (self._curr_hit_sprite + 1) % len(
-                self._hit_sprites)
+    This class handles the drawing of, spawning in, and health and damage
+    caused by this enemy.
 
-        x, y = self.rect.topleft
-        x -= 80
-        y -= 80
-        window.blit(self._hit_sprites[self._curr_hit_sprite], (x, y))
+    === Public Attributes ===
+    rect:
+         The pygame rectangle for this enemy
+    curr_sprite:
+         The sprite which is currently selected and is being displayed on the
+         screen
+    health:
+         The amount of health, or lives, this enemy has
+    play_hit_animation:
+         A boolean variable that is checked to see if the enemy hit animation
+         should be played
+    dead:
+         A boolean indicating whether the enemy is dead (True) or alive (false)
+    remove:
+         A boolean indicating whether this enemy should be removed from the
+         enemy list in the main() function
+    """
+    # === Private Attributes ===
+    # _enemy_sprites:
+    #     A list containing the various sprites of the enemies
+    # _facing:
+    #     A string that represents the direction this enemy's sprite is
+    #     currently facing
+    # _last_updated:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     animation was last updated
+    # _curr_frame_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_enemy_sprites> is selected
+    # _hit_sprites:
+    #     A list of sprites representing the blood when this enemy is hot
+    # _death_sprites:
+    #    A list of sprites representing the blood when this enemy dies
+    # _last_update_hit:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     hit animation was last updated
+    # _last_update_dead:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     death animation was last updated
+    # _curr_hit_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_hit_sprites> is selected
+    # _curr_death_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_death_sprites> is selected
 
-        if self._curr_hit_sprite == 27:
-            self.play_hit_animation = False
+    rect: pygame.Rect
+    curr_sprite: pygame.Surface
+    health: int
+    play_hit_animation: bool
+    dead: bool
+    remove: bool
+    _facing: str
+    _last_updated: int
+    _curr_frame_sprite: int
+    _curr_hit_sprite: int
+    _curr_death_sprite: int
+    _last_update_hit: int
+    _last_update_dead: int
+    _death_sprites: list[pygame.Surface]
+    _enemy_sprites: list[pygame.Surface]
+    _hit_sprites: list[pygame.Surface]
 
-    def death_animation(self, window: pygame.Surface) -> None:
-        now = pygame.time.get_ticks()
-
-        if now - self._last_update_dead > 25:
-            self._last_update_dead = now
-            self._curr_death_sprite = (self._curr_death_sprite + 1) % len(
-                self._death_sprites)
-
-        x, y = self.rect.topleft
-        x -= 60
-        y -= 60
-        window.blit(self._death_sprites[self._curr_death_sprite], (x, y))
-
-        if self._curr_death_sprite == 29:
-            self.remove = True
+    def __init__(self) -> None:
+        Enemy.__init__(self)
+        self._enemy_sprites = BAT_SPRITES
+        self.curr_sprite = self._enemy_sprites[0]
+        self.rect = self.curr_sprite.get_rect()
+        self.spawn()
