@@ -16,6 +16,7 @@ HEART = pygame.transform.scale(pygame.image.load('Assets/misc/heart.png'), (32,
                                                                             32))
 LASER_SOUND = pygame.mixer.Sound('Assets/sounds/laser_sound.wav')
 LASER_SOUND.set_volume(0.2)
+RELOAD_SOUND = pygame.mixer.Sound('Assets/sounds/reload.wav')
 CHARACTER_STILL = pygame.image.load('Assets/character/char_still.png')
 CHARACTER_RIGHT = pygame.image.load('Assets/character/char_right.png')
 CHARACTER_LEFT = pygame.image.load('Assets/character/char_left.png')
@@ -23,14 +24,16 @@ CHAR_HIT = pygame.mixer.Sound('Assets/sounds/player_hit.wav')
 CHAR_DIM = 128
 SPEED = 5
 BULL_VEL = 6
+GUN_AMMO = 32
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 YELLOW = (255, 255, 0)
+RED = (255, 0, 0)
 pygame.display.set_caption("Moon Mayhem 2")
 pygame.display.set_icon(ICON)
 FPS = 60
 FONT = pygame.font.Font('Assets/misc/font.ttf', 34)
-FONT_SMALL = pygame.font.Font('Assets/misc/font.ttf', 20)
+FONT_SMALL = pygame.font.Font('Assets/misc/font.ttf', 24)
 
 
 class Player:
@@ -50,6 +53,10 @@ class Player:
          shot
     money:
          An integer representing the amount of money the player currently has
+    ammo:
+         The total amount of ammo this player has remaining
+    curr_ammo:
+         The amount of ammo in the player's gun right now
     """
     # === Private Attributes ==
     # _move_sprites:
@@ -76,6 +83,10 @@ class Player:
     health: int
     bullets: list[tuple[pygame.Rect, float, float]]
     money: int
+    ammo: int
+    curr_ammo: int
+    need_reload: bool
+    out_of_ammo: bool
     _move_sprites: list[pygame.Surface]
     _curr_move_sprite: int
     _death_sprites: list[pygame.Surface]
@@ -98,6 +109,10 @@ class Player:
         self.bullets = []
         self.health = 5
         self.money = 0
+        self.ammo = GUN_AMMO * 2
+        self.curr_ammo = GUN_AMMO
+        self.need_reload = False
+        self.out_of_ammo = False
 
     def move(self, key_pressed) -> None:
         """Move the character depending on which keys are pressed in key_pressed
@@ -148,16 +163,28 @@ class Player:
         """
         return pygame.transform.rotate(self.sprite, rotation)
 
+    def _no_ammo(self) -> None:
+        if self.ammo < 1:
+            self.out_of_ammo = True
+        else:
+            self.need_reload = True
+
     def shoot_bullet(self, mx: int, my: int) -> None:
         """Handle the shooting of a bullet"""
-        bullet = LASER.get_rect()
-        x, y = self.rect.center
-        bullet.center = x, y
-        angle = math.atan2(y - my, x - mx)
-        x_vel = math.cos(angle) * BULL_VEL
-        y_vel = math.sin(angle) * BULL_VEL
-        LASER_SOUND.play()
-        self.bullets.append((bullet, x_vel, y_vel))
+        if self.curr_ammo > 0:
+            bullet = LASER.get_rect()
+            x, y = self.rect.center
+            bullet.center = x, y
+            angle = math.atan2(y - my, x - mx)
+            x_vel = math.cos(angle) * BULL_VEL
+            y_vel = math.sin(angle) * BULL_VEL
+            LASER_SOUND.play()
+            self.curr_ammo -= 1
+            if self.ammo > 0:
+                self.ammo -= 1
+            self.bullets.append((bullet, x_vel, y_vel))
+        else:
+            self._no_ammo()
 
     def _handle_bullets(self, bullet: tuple[pygame.Rect, float, float],
                         enemies: list) -> None:
@@ -183,6 +210,30 @@ class Player:
             bullet[0].y -= bullet[2]
             WINDOW.blit(LASER, (bullet[0].x, bullet[0].y))
             self._handle_bullets(bullet, enemies)
+
+    def draw_ammo(self) -> None:
+        ammo_text = FONT.render('Ammo: ' + str(self.curr_ammo) + ' / ' + str(GUN_AMMO), False, WHITE)
+        WINDOW.blit(ammo_text, (WIDTH - 175, HEIGHT - 100))
+        total_text = FONT_SMALL.render('Total Ammo: ' + str(self.ammo), False, WHITE)
+        WINDOW.blit(total_text, (WIDTH - 165, HEIGHT - 72))
+
+        if self.need_reload:
+            reload_text = FONT_SMALL.render('PRESS "R" TO RELOAD!', False, RED)
+            WINDOW.blit(reload_text, (WIDTH - 205, HEIGHT - 115))
+        elif self.out_of_ammo:
+            reload_text = FONT_SMALL.render('OUT OF AMMO! BUY MORE!', False, RED)
+            WINDOW.blit(reload_text, (WIDTH - 235, HEIGHT - 115))
+
+    def reload(self) -> None:
+        if self.ammo <= 32:
+            self.curr_ammo += self.ammo
+            self.ammo = 0
+        else:
+            self.ammo -= 32
+            self.curr_ammo = 32
+
+        self.need_reload = False
+        RELOAD_SOUND.play()
 
     def draw_hearts(self) -> None:
         """Display the hearts representing the player's health
@@ -248,6 +299,7 @@ def draw_window(char: Player, rotation: float, enemies: list):
     WINDOW.blit(HEALTH, (WIDTH - 355, HEIGHT - 35))
     char.draw_hearts()
     char.display_money()
+    char.draw_ammo()
     pygame.display.update()
 
 
@@ -270,6 +322,9 @@ def main():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     char.shoot_bullet(mx, my)
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r and char.need_reload:
+                    char.reload()
 
         key_pressed = pygame.key.get_pressed()
         char.move(key_pressed)
