@@ -14,6 +14,10 @@ HEALTH = pygame.transform.scale(pygame.image.load('Assets/misc/health_title.png'
                                                   ), (103, 19))
 HEART = pygame.transform.scale(pygame.image.load('Assets/misc/heart.png'), (32,
                                                                             32))
+CHEST = pygame.transform.scale(pygame.image.load('Assets/misc/chest.png'), (66, 64))
+PLATFORM = pygame.transform.scale(pygame.image.load('Assets/misc/platform.png'), (188, 144))
+PLATFORM_RECT = PLATFORM.get_rect()
+PLATFORM_RECT.topleft = (WIDTH // 2 - 94, 30)
 LASER_SOUND = pygame.mixer.Sound('Assets/sounds/laser_sound.wav')
 LASER_SOUND.set_volume(0.2)
 RELOAD_SOUND = pygame.mixer.Sound('Assets/sounds/reload.wav')
@@ -21,10 +25,12 @@ CHARACTER_STILL = pygame.image.load('Assets/character/char_still.png')
 CHARACTER_RIGHT = pygame.image.load('Assets/character/char_right.png')
 CHARACTER_LEFT = pygame.image.load('Assets/character/char_left.png')
 CHAR_HIT = pygame.mixer.Sound('Assets/sounds/player_hit.wav')
+NO_AMMO = pygame.mixer.Sound('Assets/sounds/no_ammo.wav')
 CHAR_DIM = 128
 SPEED = 5
 BULL_VEL = 6
 GUN_AMMO = 32
+AMMO_COST = 20
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 YELLOW = (255, 255, 0)
@@ -57,6 +63,13 @@ class Player:
          The total amount of ammo this player has remaining
     curr_ammo:
          The amount of ammo in the player's gun right now
+    need_reload:
+         A boolean variable to track if the player needs to reload their gun
+    out_of_ammo:
+         A boolean variable to track if the player is out of ammo
+    at_buy_platform:
+         A boolean variable to track if the player is standing within the
+         buy platform
     """
     # === Private Attributes ==
     # _move_sprites:
@@ -87,6 +100,8 @@ class Player:
     curr_ammo: int
     need_reload: bool
     out_of_ammo: bool
+    at_buy_platform: bool
+    has_funds: bool
     _move_sprites: list[pygame.Surface]
     _curr_move_sprite: int
     _death_sprites: list[pygame.Surface]
@@ -113,6 +128,8 @@ class Player:
         self.curr_ammo = GUN_AMMO
         self.need_reload = False
         self.out_of_ammo = False
+        self.at_buy_platform = False
+        self.has_funds = False
 
     def move(self, key_pressed) -> None:
         """Move the character depending on which keys are pressed in key_pressed
@@ -168,6 +185,8 @@ class Player:
             self.out_of_ammo = True
         else:
             self.need_reload = True
+
+        NO_AMMO.play()
 
     def shoot_bullet(self, mx: int, my: int) -> None:
         """Handle the shooting of a bullet"""
@@ -281,12 +300,40 @@ class Player:
             if kill[2] == 0:
                 self._money_gain.remove(kill)
 
+    def check_buy(self) -> None:
+        self.at_buy_platform = False
+        self.has_funds = False
+
+        if self.rect.colliderect(PLATFORM_RECT):
+            if self.money >= AMMO_COST:
+                buy_text = FONT_SMALL.render('PRESS "B" TO BUY ' + str(GUN_AMMO) + ' AMMO ($' + str(AMMO_COST) + ')', False, YELLOW)
+                x, y = PLATFORM_RECT.bottomleft
+                x -= 50
+                WINDOW.blit(buy_text, (x, y))
+                self.at_buy_platform = True
+                self.has_funds = True
+            else:
+                no_fund_text = FONT_SMALL.render('NOT ENOUGH MONEY FOR AMMO, NEED $' + str(AMMO_COST), False, YELLOW)
+                x, y = PLATFORM_RECT.bottomleft
+                x -= 90
+                WINDOW.blit(no_fund_text, (x, y))
+                self.at_buy_platform = True
+
+    def buy_ammo(self) -> None:
+        self.curr_ammo = GUN_AMMO
+        if self.curr_ammo > 0:
+            self.ammo += GUN_AMMO
+        self.money -= AMMO_COST
+        self.out_of_ammo = False
+
 
 def draw_window(char: Player, rotation: float, enemies: list):
     WINDOW.blit(BACKGROUND, (0, 0))
+    WINDOW.blit(PLATFORM, PLATFORM_RECT.topleft)
+    WINDOW.blit(CHEST, (WIDTH // 2 - 33, 60))
     curr_char = char.get_rotated(rotation)
     char.draw_bullets(enemies)
-    WINDOW.blit(curr_char, (char.rect.x, char.rect.y))
+    WINDOW.blit(curr_char, char.rect.topleft)
     for enemy in enemies:
         if not enemy.dead:
             WINDOW.blit(enemy.curr_sprite, (enemy.rect.x, enemy.rect.y))
@@ -297,6 +344,7 @@ def draw_window(char: Player, rotation: float, enemies: list):
             enemy.death_animation(WINDOW)
     WINDOW.blit(BAR, (0, HEIGHT - 50))
     WINDOW.blit(HEALTH, (WIDTH - 355, HEIGHT - 35))
+    char.check_buy()
     char.draw_hearts()
     char.display_money()
     char.draw_ammo()
@@ -325,6 +373,8 @@ def main():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r and char.need_reload:
                     char.reload()
+                if event.key == pygame.K_b and char.at_buy_platform and char.has_funds:
+                    char.buy_ammo()
 
         key_pressed = pygame.key.get_pressed()
         char.move(key_pressed)
