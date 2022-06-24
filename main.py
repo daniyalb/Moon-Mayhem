@@ -21,6 +21,7 @@ PLATFORM_RECT.topleft = (WIDTH // 2 - 94, 30)
 LASER_SOUND = pygame.mixer.Sound('Assets/sounds/laser_sound.wav')
 LASER_SOUND.set_volume(0.2)
 RELOAD_SOUND = pygame.mixer.Sound('Assets/sounds/reload.wav')
+BUY_SOUND = pygame.mixer.Sound('Assets/sounds/buy.wav')
 CHARACTER_STILL = pygame.image.load('Assets/character/char_still.png')
 CHARACTER_RIGHT = pygame.image.load('Assets/character/char_right.png')
 CHARACTER_LEFT = pygame.image.load('Assets/character/char_left.png')
@@ -42,8 +43,37 @@ FONT = pygame.font.Font('Assets/misc/font.ttf', 34)
 FONT_SMALL = pygame.font.Font('Assets/misc/font.ttf', 24)
 
 
+class Bullet:
+    """ The bullet class in this game.
+    
+    This class handles the creation of a bullet to be used in the Player
+    class.
+
+    === Public Attributes ===
+    rect: 
+         the pygame rectangle for this bullet
+    x_vel:
+         The velocity of this bullet in the x direction
+    y_vel:
+         The velocity of this bullet in the y direction
+    """
+
+    rect: pygame.Rect
+    x_vel: float
+    y_vel: float
+
+    def __init__(self, char_center, mx, my) -> None:
+        self.rect = LASER.get_rect()
+        x, y = char_center
+        self.rect.center = char_center
+        angle = math.atan2(y - my, x - mx)
+        self.x_vel = math.cos(angle) * BULL_VEL
+        self.y_vel = math.sin(angle) * BULL_VEL
+        LASER_SOUND.play()
+
+
 class Player:
-    """The player character in the game.
+    """ The player character in the game.
 
     This class handles the drawing and movement of the character in the game, as
     well as the amount of ammo they have, money they've earned, and waves
@@ -94,7 +124,7 @@ class Player:
     sprite: pygame.Surface
     rect: pygame.Rect
     health: int
-    bullets: list[tuple[pygame.Rect, float, float]]
+    bullets: list[Bullet]
     money: int
     ammo: int
     curr_ammo: int
@@ -191,43 +221,39 @@ class Player:
     def shoot_bullet(self, mx: int, my: int) -> None:
         """Handle the shooting of a bullet"""
         if self.curr_ammo > 0:
-            bullet = LASER.get_rect()
-            x, y = self.rect.center
-            bullet.center = x, y
-            angle = math.atan2(y - my, x - mx)
-            x_vel = math.cos(angle) * BULL_VEL
-            y_vel = math.sin(angle) * BULL_VEL
-            LASER_SOUND.play()
+            bullet = Bullet(self.rect.center, mx, my)
             self.curr_ammo -= 1
             if self.ammo > 0:
                 self.ammo -= 1
-            self.bullets.append((bullet, x_vel, y_vel))
+            self.bullets.append(bullet)
         else:
             self._no_ammo()
 
-    def _handle_bullets(self, bullet: tuple[pygame.Rect, float, float],
+    def _handle_bullets(self, bullet: Bullet,
                         enemies: list) -> None:
         """Handle bullet collisions
         """
-        if bullet[0].x <= 0 or bullet[0].x >= WIDTH or bullet[0].y <= 0 or \
-                bullet[0].y >= HEIGHT:
+        if bullet.rect.x <= 0 or bullet.rect.x >= WIDTH or bullet.rect.y <= 0 or \
+                bullet.rect.y >= HEIGHT:
             self.bullets.remove(bullet)
         else:
+            removed_once = False
             for enemy in enemies:
-                if enemy.rect.colliderect(bullet[0]) and not enemy.dead:
+                if not removed_once and enemy.rect.colliderect(bullet.rect) and not enemy.dead:
                     enemy.damage()
                     if enemy.dead:
                         self.add_money()
                         self._money_gain.append((enemy.rect.x, enemy.rect.y, 100))
                     self.bullets.remove(bullet)
+                    removed_once = True
 
     def draw_bullets(self, enemies: list) -> None:
         """Draws the bullets at their current location
         """
         for bullet in self.bullets:
-            bullet[0].x -= bullet[1]
-            bullet[0].y -= bullet[2]
-            WINDOW.blit(LASER, (bullet[0].x, bullet[0].y))
+            bullet.rect.x -= bullet.x_vel
+            bullet.rect.y -= bullet.y_vel
+            WINDOW.blit(LASER, (bullet.rect.x, bullet.rect.y))
             self._handle_bullets(bullet, enemies)
 
     def draw_ammo(self) -> None:
@@ -320,11 +346,11 @@ class Player:
                 self.at_buy_platform = True
 
     def buy_ammo(self) -> None:
+        self.ammo += GUN_AMMO + self.curr_ammo
         self.curr_ammo = GUN_AMMO
-        if self.curr_ammo > 0:
-            self.ammo += GUN_AMMO
         self.money -= AMMO_COST
         self.out_of_ammo = False
+        BUY_SOUND.play()
 
 
 def draw_window(char: Player, rotation: float, enemies: list):

@@ -355,6 +355,9 @@ class Bat(Enemy):
     # _last_update_dead:
     #     An integer mean to keep track of the frame when this enemy's
     #     death animation was last updated
+    # _last_update_movement:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     movement was last updated
     # _curr_hit_sprite:
     #     An integer meant to signify the index of which sprite in
     #     <_hit_sprites> is selected
@@ -375,6 +378,7 @@ class Bat(Enemy):
     _curr_death_sprite: int
     _last_update_hit: int
     _last_update_dead: int
+    _last_update_movement: int
     _death_sprites: list[pygame.Surface]
     _enemy_sprites: list[pygame.Surface]
     _hit_sprites: list[pygame.Surface]
@@ -384,4 +388,26 @@ class Bat(Enemy):
         self._enemy_sprites = BAT_SPRITES
         self.curr_sprite = self._enemy_sprites[0]
         self.rect = self.curr_sprite.get_rect()
+        self._last_update_movement = 0
+        self._target_x, self._target_y = WIDTH // 2, HEIGHT // 2
+        self._movement_update = random.randint(3000, 5000)
         self.spawn()
+
+    def move(self, x: int, y: int) -> None:
+        now = pygame.time.get_ticks()
+
+        if now - self._last_update_movement > self._movement_update:
+            self._last_update_movement = now
+            self._movement_update = random.randint(3000, 5000)
+            self._target_x = random.randint(x - 100, x + 100)
+            self._target_y = random.randint(y - 100, y + 100)
+
+        if self.rect.x <= self._target_x:
+            self.rect.x += ENEMY_SPEED + 1
+        else:
+            self.rect.x -= ENEMY_SPEED + 1
+
+        if self.rect.y <= self._target_y:
+            self.rect.y += ENEMY_SPEED + 1
+        else:
+            self.rect.y -= ENEMY_SPEED + 1
