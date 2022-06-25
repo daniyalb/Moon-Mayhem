@@ -1,6 +1,5 @@
-import pygame
-import math
-from enemy import Worm, Bat
+from numpy import square
+import pygame, math, random
 
 pygame.init()
 WIDTH, HEIGHT = 1280, 720
@@ -22,6 +21,8 @@ LASER_SOUND = pygame.mixer.Sound('Assets/sounds/laser_sound.wav')
 LASER_SOUND.set_volume(0.2)
 RELOAD_SOUND = pygame.mixer.Sound('Assets/sounds/reload.wav')
 BUY_SOUND = pygame.mixer.Sound('Assets/sounds/buy.wav')
+EXPLOSION_SOUND = pygame.mixer.Sound('Assets/sounds/explosion_sound.wav')
+TIMER_SOUND = pygame.mixer.Sound('Assets/sounds/timer.wav')
 CHARACTER_STILL = pygame.image.load('Assets/character/char_still.png')
 CHARACTER_RIGHT = pygame.image.load('Assets/character/char_right.png')
 CHARACTER_LEFT = pygame.image.load('Assets/character/char_left.png')
@@ -36,11 +37,49 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 YELLOW = (255, 255, 0)
 RED = (255, 0, 0)
+GREEN = (0, 128, 0)
 pygame.display.set_caption("Moon Mayhem 2")
 pygame.display.set_icon(ICON)
 FPS = 60
 FONT = pygame.font.Font('Assets/misc/font.ttf', 34)
 FONT_SMALL = pygame.font.Font('Assets/misc/font.ttf', 24)
+
+
+def init_enemy_sprites() -> tuple[list]:
+    """ Initialize the sprites for enemies as well as their animations and return
+    them in a tuple of lists.
+    """
+    worm_sprites = get_sprites(9, 'Assets/enemies/worm/worm', '.png', 100, 100)
+    bat_sprites = get_sprites(8, 'Assets/enemies/bat/bat', '.png', 82, 66)
+    mushroom_sprites = get_sprites(8, 'Assets/enemies/mushroom/mushroom', '.png', 63, 98)
+    mushroom_explode_sprites = get_sprites(4, 'Assets/enemies/mushroom/exploding/explode',
+                                             '.png', 63, 98)
+    explosion_sprites = get_sprites(12, 'Assets/enemies/mushroom/explosion/explosion', '.png', 189, 192)
+    hit_sprites = get_sprites(28, 'Assets/enemies/enemy_hit/', '.png', 300, 300)
+    death_sprites = get_sprites(30, 'Assets/enemies/enemy_death/', '.png', 300, 300)
+
+    return (worm_sprites, bat_sprites, mushroom_sprites, mushroom_explode_sprites, explosion_sprites, hit_sprites, death_sprites)
+
+
+def get_sprites(number_images: int, dir: str, type: str, x_dim: int, y_dim: int) -> list:
+    """ A helper function for init_enemy_sprites() which takes the number of images 
+    <number_images> of the sprtie, the directory <dir> of these images, their file 
+    type <type>, as well as the x and y dimensions of the actual enemy sprite, 
+    <x_dim> and <y_dim> respectively. The function loads these images and adds them
+    to a list with the proper scaling, and returns this list.
+    """
+    sprite_list = []
+    for i in range(1, number_images + 1):
+        sprite = pygame.image.load(dir + str(i) + type)
+        sprite = pygame.transform.scale(sprite, (x_dim, y_dim))
+        sprite_list.append(sprite)
+    return sprite_list
+
+
+WORM_SPRITES, BAT_SPRITES, MUSHROOM_SPRITES, MUSHROOM_EXPLODE_SPRITES, EXPLOSION_SPRTIES, HIT_SPRITES, DEATH_SPRITES = init_enemy_sprites()
+ENEMY_HIT = pygame.mixer.Sound('Assets/sounds/enemy_hit.wav')
+ENEMY_DEATH = pygame.mixer.Sound('Assets/sounds/enemy_death.wav')
+ENEMY_SPEED = 1
 
 
 class Bullet:
@@ -272,9 +311,7 @@ class Player:
     def reload(self) -> None:
         if self.ammo <= 32:
             self.curr_ammo += self.ammo
-            self.ammo = 0
         else:
-            self.ammo -= 32
             self.curr_ammo = 32
 
         self.need_reload = False
@@ -292,18 +329,23 @@ class Player:
         """ Check if this <enemy> has collided with the player, and if they
         did, lower the players health"""
         now = pygame.time.get_ticks()
-        if now - self._last_update_damage > 1000:
+
+        if isinstance(enemy, Mushroom) and self.rect.colliderect(enemy) and \
+             enemy.exploded and not enemy.player_damaged:
+            self.health -= enemy.player_damage
+            enemy.player_damaged = True
+        elif now - self._last_update_damage > 1000:
             if self.rect.colliderect(enemy) and not enemy.dead:
-                self.health -= 1
+                self.health -= enemy.player_damage
                 CHAR_HIT.play()
-            self._last_update_damage = now
+                self._last_update_damage = now
 
     def update_health(self) -> None:
         """ Use a clock to determine when the player's health should be increased
         and only increase health if self.health < 5
         """
         now = pygame.time.get_ticks()
-        if now - self._last_update_health > 2000:
+        if now - self._last_update_health > 3000:
             self._last_update_health = now
             if self.health < 5:
                 self.health += 1
@@ -346,11 +388,582 @@ class Player:
                 self.at_buy_platform = True
 
     def buy_ammo(self) -> None:
-        self.ammo += GUN_AMMO + self.curr_ammo
+        self.ammo += GUN_AMMO
         self.curr_ammo = GUN_AMMO
         self.money -= AMMO_COST
         self.out_of_ammo = False
         BUY_SOUND.play()
+
+
+class Enemy:
+    """ The enemy class for this game.
+
+    Do not instantiate this class, it is an abstract class.
+
+    === Public Attributes ===
+    rect:
+         The pygame rectangle for this enemy
+    curr_sprite:
+         The sprite which is currently selected and is being displayed on the
+         screen
+    health:
+         The amount of health, or lives, this enemy has
+    play_hit_animation:
+         A boolean variable that is checked to see if the enemy hit animation
+         should be played
+    dead:
+         A boolean indicating whether the enemy is dead (True) or alive (false)
+    remove:
+         A boolean indicating whether this enemy should be removed from the
+         enemy list in the main() function
+    player_damage:
+         The amount of damage this enemy causes to the player
+    """
+    # === Private Attributes ===
+    # _enemy_sprites:
+    #     A list containing the various sprites of the enemies
+    # _facing:
+    #     A string that represents the direction this enemy's sprite is
+    #     currently facing
+    # _last_updated:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     animation was last updated
+    # _curr_frame_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_enemy_sprites> is selected
+    # _hit_sprites:
+    #     A list of sprites representing the blood when this enemy is hot
+    # _death_sprites:
+    #    A list of sprites representing the blood when this enemy dies
+    # _last_update_hit:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     hit animation was last updated
+    # _last_update_dead:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     death animation was last updated
+    # _curr_hit_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_hit_sprites> is selected
+    # _curr_death_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_death_sprites> is selected
+    # _update_animation:
+    #    An integer that represents the amount of frames between when
+    #    the sprite animations are changed
+
+    rect: pygame.Rect
+    curr_sprite: pygame.Surface
+    health: int
+    play_hit_animation: bool
+    dead: bool
+    remove: bool
+    player_damage: int
+    _facing: str
+    _last_updated: int
+    _curr_frame_sprite: int
+    _curr_hit_sprite: int
+    _curr_death_sprite: int
+    _last_update_hit: int
+    _last_update_dead: int
+    _update_animation: int
+    _death_sprites: list[pygame.Surface]
+    _enemy_sprites: list[pygame.Surface]
+    _hit_sprites: list[pygame.Surface]
+
+    def __init__(self) -> None:
+        self._last_updated = 0
+        self._curr_frame_sprite = 0
+        self._last_update_hit = 0
+        self._last_update_dead = 0
+        self._curr_hit_sprite = 0
+        self._curr_death_sprite = 0
+        self._update_animation = 200
+        self.health = 3
+        self.player_damage = 1
+        self._facing = 'right'
+        self.dead = False
+        self.remove = False
+        self._hit_sprites = HIT_SPRITES
+        self._death_sprites = DEATH_SPRITES
+        self.play_hit_animation = False
+
+    def spawn(self) -> None:
+        """ Spawn in this enemy somewhere outside of the viewable screen
+        """
+        x, y = 0, 0
+        while (0 <= x <= WIDTH) and (0 <= y <= HEIGHT):
+            x = random.randint(-500, WIDTH + 500)
+            y = random.randint(-500, HEIGHT + 500)
+        self.rect.center = (x, y)
+
+    def damage(self) -> None:
+        """ Register the fact that this enemy was damaged
+        """
+        self.health -= 1
+        ENEMY_HIT.play()
+        if self.health == 0:
+            self.dead = True
+            ENEMY_DEATH.play()
+        else:
+            self.play_hit_animation = True
+
+    def draw_health(self, window: pygame.Surface) -> None:
+        x1, y1 = self.rect.bottomleft
+        x1 += 16
+        y1 += 6
+        x2, y2 = self.rect.bottomright
+        x2 -= 16
+        y2 += 6
+
+        if self.health == 2:
+            split = int((x2 - x1) * 0.66)
+            split += x1
+            pygame.draw.line(window, GREEN, (x1, y1), (split, y2), 4)
+            pygame.draw.line(window, RED, (split, y1), (x2, y2), 4)
+        elif self.health == 1:
+            split = int((x2 - x1) * 0.33)
+            split += x1
+            pygame.draw.line(window, GREEN, (x1, y1), (split, y2), 4)
+            pygame.draw.line(window, RED, (split, y1), (x2, y2), 4)
+        else:
+            pygame.draw.line(window, GREEN, (x1, y1), (x2, y2), 4)
+
+    def animate(self, x: int, y: int) -> None:
+        """ Animate the enemy by cycling through it's animation as it moves
+        """
+        now = pygame.time.get_ticks()
+
+        if now - self._last_updated > self._update_animation:
+            self._last_updated = now
+            self._curr_frame_sprite = (self._curr_frame_sprite + 1) % len(
+                self._enemy_sprites)
+            if self._facing == 'right':
+                self.curr_sprite = self._enemy_sprites[self._curr_frame_sprite]
+            else:
+                self.curr_sprite = pygame.transform.flip(self._enemy_sprites[
+                                        self._curr_frame_sprite], True, False)
+
+            if x < self.rect.x and self._facing == 'right':
+                self.curr_sprite = pygame.transform.flip(self.curr_sprite, True,
+                                                         False)
+                self._facing = 'left'
+            elif x > self.rect.x and self._facing == 'left':
+                self.curr_sprite = pygame.transform.flip(self.curr_sprite, True,
+                                                         False)
+                self._facing = 'right'
+
+    def hit_animation(self, window: pygame.Surface) -> None:
+        now = pygame.time.get_ticks()
+
+        if now - self._last_update_hit > 25:
+            self._last_update_hit = now
+            self._curr_hit_sprite = (self._curr_hit_sprite + 1) % len(
+                self._hit_sprites)
+
+        x, y = self.rect.topleft
+        x -= 80
+        y -= 80
+        window.blit(self._hit_sprites[self._curr_hit_sprite], (x, y))
+
+        if self._curr_hit_sprite == 27:
+            self.play_hit_animation = False
+
+    def death_animation(self, window: pygame.Surface) -> None:
+        now = pygame.time.get_ticks()
+
+        if now - self._last_update_dead > 25:
+            self._last_update_dead = now
+            self._curr_death_sprite = (self._curr_death_sprite + 1) % len(
+                self._death_sprites)
+
+        x, y = self.rect.topleft
+        x -= 60
+        y -= 60
+        window.blit(self._death_sprites[self._curr_death_sprite], (x, y))
+
+        if self._curr_death_sprite == 29:
+            self.remove = True
+
+
+class Worm(Enemy):
+    """The Worm Enemy class for this game.
+
+    This class handles the drawing of, spawning in, and health and damage
+    caused by this enemy.
+
+    === Public Attributes ===
+    rect:
+         The pygame rectangle for this enemy
+    curr_sprite:
+         The sprite which is currently selected and is being displayed on the
+         screen
+    health:
+         The amount of health, or lives, this enemy has
+    play_hit_animation:
+         A boolean variable that is checked to see if the enemy hit animation
+         should be played
+    dead:
+         A boolean indicating whether the enemy is dead (True) or alive (false)
+    remove:
+         A boolean indicating whether this enemy should be removed from the
+         enemy list in the main() function
+    player_damage:
+         The amount of damage this enemy causes to the player
+    """
+    # === Private Attributes ===
+    # _enemy_sprites:
+    #     A list containing the various sprites of the enemies
+    # _facing:
+    #     A string that represents the direction this enemy's sprite is
+    #     currently facing
+    # _last_updated:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     animation was last updated
+    # _curr_frame_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_enemy_sprites> is selected
+    # _hit_sprites:
+    #     A list of sprites representing the blood when this enemy is hot
+    # _death_sprites:
+    #    A list of sprites representing the blood when this enemy dies
+    # _last_update_hit:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     hit animation was last updated
+    # _last_update_dead:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     death animation was last updated
+    # _curr_hit_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_hit_sprites> is selected
+    # _curr_death_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_death_sprites> is selected
+    # _update_animation:
+    #    An integer that represents the amount of frames between when
+    #    the sprite animations are changed
+
+    rect: pygame.Rect
+    curr_sprite: pygame.Surface
+    health: int
+    play_hit_animation: bool
+    dead: bool
+    remove: bool
+    player_damage: int
+    _facing: str
+    _last_updated: int
+    _curr_frame_sprite: int
+    _curr_hit_sprite: int
+    _curr_death_sprite: int
+    _last_update_hit: int
+    _last_update_dead: int
+    _update_animation: int
+    _death_sprites: list[pygame.Surface]
+    _enemy_sprites: list[pygame.Surface]
+    _hit_sprites: list[pygame.Surface]
+
+    def __init__(self) -> None:
+        Enemy.__init__(self)
+        self._enemy_sprites = WORM_SPRITES
+        self.curr_sprite = self._enemy_sprites[0]
+        self.rect = self.curr_sprite.get_rect()
+        self.spawn()
+
+    def move(self, x: int, y: int) -> None:
+        if self.rect.x <= x:
+            self.rect.x += ENEMY_SPEED
+        else:
+            self.rect.x -= ENEMY_SPEED
+
+        if self.rect.y <= y:
+            self.rect.y += ENEMY_SPEED
+        else:
+            self.rect.y -= ENEMY_SPEED
+
+
+class Bat(Enemy):
+    """The Bat Enemy class for this game.
+
+    This class handles the drawing of, spawning in, and health and damage
+    caused by this enemy.
+
+    === Public Attributes ===
+    rect:
+         The pygame rectangle for this enemy
+    curr_sprite:
+         The sprite which is currently selected and is being displayed on the
+         screen
+    health:
+         The amount of health, or lives, this enemy has
+    play_hit_animation:
+         A boolean variable that is checked to see if the enemy hit animation
+         should be played
+    dead:
+         A boolean indicating whether the enemy is dead (True) or alive (false)
+    remove:
+         A boolean indicating whether this enemy should be removed from the
+         enemy list in the main() function
+    player_damage:
+         The amount of damage this enemy causes to the player
+    """
+    # === Private Attributes ===
+    # _enemy_sprites:
+    #     A list containing the various sprites of the enemies
+    # _facing:
+    #     A string that represents the direction this enemy's sprite is
+    #     currently facing
+    # _last_updated:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     animation was last updated
+    # _curr_frame_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_enemy_sprites> is selected
+    # _hit_sprites:
+    #     A list of sprites representing the blood when this enemy is hot
+    # _death_sprites:
+    #    A list of sprites representing the blood when this enemy dies
+    # _last_update_hit:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     hit animation was last updated
+    # _last_update_dead:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     death animation was last updated
+    # _last_update_movement:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     movement was last updated
+    # _curr_hit_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_hit_sprites> is selected
+    # _curr_death_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_death_sprites> is selected
+    # _update_animation:
+    #    An integer that represents the amount of frames between when
+    #    the sprite animations are changed
+
+    rect: pygame.Rect
+    curr_sprite: pygame.Surface
+    health: int
+    play_hit_animation: bool
+    dead: bool
+    remove: bool
+    player_damage: int
+    _facing: str
+    _last_updated: int
+    _curr_frame_sprite: int
+    _curr_hit_sprite: int
+    _curr_death_sprite: int
+    _last_update_hit: int
+    _last_update_dead: int
+    _last_update_movement: int
+    _update_animation: int
+    _death_sprites: list[pygame.Surface]
+    _enemy_sprites: list[pygame.Surface]
+    _hit_sprites: list[pygame.Surface]
+
+    def __init__(self) -> None:
+        Enemy.__init__(self)
+        self._enemy_sprites = BAT_SPRITES
+        self.curr_sprite = self._enemy_sprites[0]
+        self.rect = self.curr_sprite.get_rect()
+        self._last_update_movement = 0
+        self._target_x, self._target_y = WIDTH // 2, HEIGHT // 2
+        self._movement_update = random.randint(3000, 5000)
+        self.spawn()
+
+    def move(self, x: int, y: int) -> None:
+        now = pygame.time.get_ticks()
+
+        if now - self._last_update_movement > self._movement_update:
+            self._last_update_movement = now
+            self._movement_update = random.randint(3000, 5000)
+            self._target_x = random.randint(x - 100, x + 100)
+            self._target_y = random.randint(y - 100, y + 100)
+
+        if self.rect.x <= self._target_x:
+            self.rect.x += ENEMY_SPEED + 1
+        else:
+            self.rect.x -= ENEMY_SPEED + 1
+
+        if self.rect.y <= self._target_y:
+            self.rect.y += ENEMY_SPEED + 1
+        else:
+            self.rect.y -= ENEMY_SPEED + 1
+
+class Mushroom(Enemy):
+    """The Mushroom Enemy class for this game.
+
+    This class handles the drawing of, spawning in, and health and damage
+    caused by this enemy.
+
+    === Public Attributes ===
+    rect:
+         The pygame rectangle for this enemy
+    curr_sprite:
+         The sprite which is currently selected and is being displayed on the
+         screen
+    health:
+         The amount of health, or lives, this enemy has
+    play_hit_animation:
+         A boolean variable that is checked to see if the enemy hit animation
+         should be played
+    dead:
+         A boolean indicating whether the enemy is dead (True) or alive (false)
+    remove:
+         A boolean indicating whether this enemy should be removed from the
+         enemy list in the main() function
+    player_damage:
+         The amount of damage this enemy causes to the player
+    exploded:
+         A boolean which indicates whether this enemy has began their
+         explosion or not
+    player_damaged:
+         A boolean to track if this enemy's explosion has damaged the player
+    """
+    # === Private Attributes ===
+    # _enemy_sprites:
+    #     A list containing the various sprites of the enemies
+    # _facing:
+    #     A string that represents the direction this enemy's sprite is
+    #     currently facing
+    # _last_updated:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     animation was last updated
+    # _curr_frame_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_enemy_sprites> is selected
+    # _hit_sprites:
+    #     A list of sprites representing the blood when this enemy is hot
+    # _death_sprites:
+    #    A list of sprites representing the blood when this enemy dies
+    # _last_update_hit:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     hit animation was last updated
+    # _last_update_dead:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     death animation was last updated
+    # _last_update_explode:
+    #     An integer mean to keep track of the frame when this enemy's
+    #     explosion timer was last updated
+    # _curr_hit_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_hit_sprites> is selected
+    # _curr_death_sprite:
+    #     An integer meant to signify the index of which sprite in
+    #     <_death_sprites> is selected
+    # _update_animation:
+    #    An integer that represents the amount of frames between when
+    #    the sprite animations are changed
+    # _sprite_changed:
+    #    A boolean variable that tracks if this enemy's sprite list in
+    #    <self._enemy_sprites> has been changed or not
+    # _close:
+    #    A boolean which tracks if this enemy is within 100 pixels of the
+    #    player
+
+    rect: pygame.Rect
+    curr_sprite: pygame.Surface
+    health: int
+    play_hit_animation: bool
+    dead: bool
+    remove: bool
+    player_damage: int
+    exploded: bool
+    player_damaged: bool
+    _facing: str
+    _last_updated: int
+    _curr_frame_sprite: int
+    _curr_hit_sprite: int
+    _curr_death_sprite: int
+    _last_update_hit: int
+    _last_update_dead: int
+    _last_update_explode: int
+    _update_animation: int
+    _sprite_changed: bool
+    _close: bool
+    _death_sprites: list[pygame.Surface]
+    _enemy_sprites: list[pygame.Surface]
+    _hit_sprites: list[pygame.Surface]
+
+    def __init__(self) -> None:
+        Enemy.__init__(self)
+        self._enemy_sprites = MUSHROOM_SPRITES
+        self.curr_sprite = self._enemy_sprites[0]
+        self.rect = self.curr_sprite.get_rect()
+        self.exploded = False
+        self.player_damaged = False
+        self._update_animation = 150
+        self._last_update_explode = 0
+        self._sprite_changed = False
+        self._close = False
+        self.spawn()
+
+    def move(self, x: int, y: int) -> None:
+        self._close_to_player(x, y)
+
+        if not self._close:
+            if self.rect.x <= x:
+                self.rect.x += ENEMY_SPEED
+            else:
+                self.rect.x -= ENEMY_SPEED
+
+            if self.rect.y <= y:
+                self.rect.y += ENEMY_SPEED
+            else:
+                self.rect.y -= ENEMY_SPEED
+        else:
+            self._change_sprite()
+            self._explode()
+
+    def _close_to_player(self, x: int, y: int) -> bool:
+        """ Return whether this mushroom enemy is close enough
+        to the player to explode
+        """
+        dx = abs(self.rect.x - x)
+        dy = abs(self.rect.y - y)
+        dist = math.sqrt((dx**2) + (dy**2))
+        if dist <= 100.0:
+            self._close = True
+
+    def _change_sprite(self) -> None:
+        """ Change the enemies sprites in <self._enemy_sprites> to
+        a different list of sprites only once, also update the
+        <self._last_update_explode> timer to the current frame
+        """
+        if not self._sprite_changed:
+            self._enemy_sprites = MUSHROOM_EXPLODE_SPRITES
+            self._last_update_explode = pygame.time.get_ticks()
+            TIMER_SOUND.play()
+            self._sprite_changed = True
+
+    def _explode(self) -> None:
+        """ A helper method that tracks the remaining frames left until
+        this enemy explodes
+        """
+        now = pygame.time.get_ticks()
+
+        if now - self._last_update_explode > 3000 and not self.exploded and not self.dead:
+            self.player_damage = 3
+            x, y = self.rect.center
+            self._death_sprites = EXPLOSION_SPRTIES
+            self.rect = self._death_sprites[0].get_rect()
+            self.rect.center = (x, y)
+            EXPLOSION_SOUND.play()
+            self.dead = True
+            self.exploded = True
+
+    def death_animation(self, window: pygame.Surface) -> None:
+        TIMER_SOUND.stop()
+        if self.exploded:
+            now = pygame.time.get_ticks()
+            window.blit(self._death_sprites[self._curr_death_sprite], self.rect.topleft)
+            if now - self._last_update_dead > 60:
+                self._last_update_dead = now
+                self._curr_death_sprite = (self._curr_death_sprite + 1) % len(
+                    self._death_sprites)
+            if self._curr_death_sprite == 11:
+                self.remove = True
+        else:
+            Enemy.death_animation(self, window)
 
 
 def draw_window(char: Player, rotation: float, enemies: list):
@@ -381,7 +994,7 @@ def main():
     run = True
     clock = pygame.time.Clock()
     char = Player()
-    enemies = [Worm(), Worm(), Bat(), Bat()]
+    enemies = [Mushroom(), Worm()]
     pygame.mixer.music.load('Assets/sounds/background_music.wav')
     pygame.mixer.music.set_volume(0.6)
     pygame.mixer.music.play(-1)
@@ -411,7 +1024,7 @@ def main():
                 enemies.remove(enemy)
             else:
                 enemy.animate(char.rect.x, char.rect.y)
-                enemy.move(char.rect.x, char.rect.y)
+                enemy.move(char.rect.centerx, char.rect.centery)
                 char.check_damage(enemy)
 
         draw_window(char, rotation, enemies)
