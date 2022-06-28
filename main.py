@@ -1,3 +1,4 @@
+from re import I
 from numpy import square
 import pygame, math, random
 
@@ -23,6 +24,8 @@ RELOAD_SOUND = pygame.mixer.Sound('Assets/sounds/reload.wav')
 BUY_SOUND = pygame.mixer.Sound('Assets/sounds/buy.wav')
 EXPLOSION_SOUND = pygame.mixer.Sound('Assets/sounds/explosion_sound.wav')
 TIMER_SOUND = pygame.mixer.Sound('Assets/sounds/timer.wav')
+WAVE_START = pygame.mixer.Sound('Assets/sounds/wave_start.wav')
+WAVE_FINISH = pygame.mixer.Sound('Assets/sounds/wave_complete.wav')
 CHARACTER_STILL = pygame.image.load('Assets/character/char_still.png')
 CHARACTER_RIGHT = pygame.image.load('Assets/character/char_right.png')
 CHARACTER_LEFT = pygame.image.load('Assets/character/char_left.png')
@@ -43,6 +46,8 @@ pygame.display.set_icon(ICON)
 FPS = 60
 FONT = pygame.font.Font('Assets/misc/font.ttf', 34)
 FONT_SMALL = pygame.font.Font('Assets/misc/font.ttf', 24)
+FONT_BOLD = pygame.font.Font('Assets/misc/bold_font.ttf', 34)
+FONT_BOLD_LARGE = pygame.font.Font('Assets/misc/bold_font.ttf', 54)
 
 
 def init_enemy_sprites() -> tuple[list]:
@@ -297,16 +302,16 @@ class Player:
 
     def draw_ammo(self) -> None:
         ammo_text = FONT.render('Ammo: ' + str(self.curr_ammo) + ' / ' + str(GUN_AMMO), False, WHITE)
-        WINDOW.blit(ammo_text, (WIDTH - 175, HEIGHT - 100))
+        WINDOW.blit(ammo_text, (WIDTH - 225, HEIGHT - 130))
         total_text = FONT_SMALL.render('Total Ammo: ' + str(self.ammo), False, WHITE)
-        WINDOW.blit(total_text, (WIDTH - 165, HEIGHT - 72))
+        WINDOW.blit(total_text, (WIDTH - 195, HEIGHT - 90))
 
         if self.need_reload:
             reload_text = FONT_SMALL.render('PRESS "R" TO RELOAD!', False, RED)
-            WINDOW.blit(reload_text, (WIDTH - 205, HEIGHT - 115))
+            WINDOW.blit(reload_text, (WIDTH - 235, HEIGHT - 155))
         elif self.out_of_ammo:
             reload_text = FONT_SMALL.render('OUT OF AMMO! BUY MORE!', False, RED)
-            WINDOW.blit(reload_text, (WIDTH - 235, HEIGHT - 115))
+            WINDOW.blit(reload_text, (WIDTH - 285, HEIGHT - 155))
 
     def reload(self) -> None:
         if self.ammo <= 32:
@@ -357,7 +362,7 @@ class Player:
 
     def display_money(self) -> None:
         money_text = FONT.render('Money: $' + str(self.money), False, WHITE)
-        WINDOW.blit(money_text, (20, HEIGHT - 40))
+        WINDOW.blit(money_text, (20, HEIGHT - 50))
 
         for i in range(len(self._money_gain)):
             kill_text = FONT_SMALL.render('+ $10', False, YELLOW)
@@ -376,14 +381,14 @@ class Player:
             if self.money >= AMMO_COST:
                 buy_text = FONT_SMALL.render('PRESS "B" TO BUY ' + str(GUN_AMMO) + ' AMMO ($' + str(AMMO_COST) + ')', False, YELLOW)
                 x, y = PLATFORM_RECT.bottomleft
-                x -= 50
+                x -= 70
                 WINDOW.blit(buy_text, (x, y))
                 self.at_buy_platform = True
                 self.has_funds = True
             else:
                 no_fund_text = FONT_SMALL.render('NOT ENOUGH MONEY FOR AMMO, NEED $' + str(AMMO_COST), False, YELLOW)
                 x, y = PLATFORM_RECT.bottomleft
-                x -= 90
+                x -= 130
                 WINDOW.blit(no_fund_text, (x, y))
                 self.at_buy_platform = True
 
@@ -965,28 +970,169 @@ class Mushroom(Enemy):
         else:
             Enemy.death_animation(self, window)
 
+    
+class Wave:
+    """ The Wave class for this game.
+    
+    This class is responsible for the starting and ending of waves, 
+    determining the number of enemies to spawn, and tracking how many 
+    enemies are left.
 
-def draw_window(char: Player, rotation: float, enemies: list):
+    === Public Attributes ===
+    wave:
+         An integer which tracks which wave the game is currently on
+    enemies:
+         A list of enemies of the Enemy class that are spawned in the 
+         current wave
+    """
+    # === Private Attributes ===
+    # _last_update_start:
+    #    An integer meant ot keep track of the frame in which the wave
+    #    start animation was last updated
+    # _last_update_complete:
+    #    An integer meant ot keep track of the frame in which the wave
+    #    completion animation was last updated
+
+    wave: int
+    enemies: list
+    begin: bool
+    start_wave_anim: bool
+    wave_complete: bool
+
+    def __init__(self) -> None:
+        self.wave = 0
+        self.enemies = []
+        self.begin = False
+        self.start_wave_anim = False
+        self.wave_complete = False
+        self.wave_commenced = False
+        self._last_update_start = 0
+        self._last_update_complete = 0
+        self.curr_enemies = 0
+
+    def begin_waves(self) -> None:
+        self.begin = True
+        self.start_wave()
+
+    def request_wave_start(self) -> None:
+        wave = str(self.wave + 1)
+        if wave[-1] == '0':
+            wave += 'TH'
+        elif len(wave) > 1 and wave == '11' or wave == '12' or wave == '13':
+            wave += 'TH'
+        elif wave[-1] == '1':
+            wave += 'ST'
+        elif wave[-1] == '2':
+            wave += 'ND'
+        elif wave[-1] == '3':
+            wave += 'RD'
+        else:
+            wave += 'TH'
+        wave_start_text = FONT_BOLD.render('PRESS "SPACEBAR" TO START THE ' + wave + ' WAVE', False, YELLOW)
+        WINDOW.blit(wave_start_text, (10, 620))
+
+    def start_wave(self) -> None:
+        self.wave += 1
+        self.start_wave_anim = True
+        self._init_enemies()
+        self.wave_commenced = True
+        self._last_update_start = pygame.time.get_ticks()
+        WAVE_START.play()
+
+    def wave_start_animation(self) -> None:
+        start_text_back = FONT_BOLD_LARGE.render('STARTING WAVE ' + str(self.wave), False, BLACK)
+        WINDOW.blit(start_text_back, (410, 605))
+        start_text = FONT_BOLD_LARGE.render('STARTING WAVE ' + str(self.wave), False, WHITE)
+        WINDOW.blit(start_text, (415, 600))
+        
+        now = pygame.time.get_ticks()
+        if now - self._last_update_start > 4000:
+            self.start_wave_anim = False
+
+    def _init_enemies(self) -> None:
+        num_enemies = self.wave + 2
+        i = 0
+        while i < num_enemies:
+            random_num = random.randint(1, 3)
+            if random_num == 1:
+                self.enemies.append(Worm())
+            elif random_num == 2:
+                self.enemies.append(Bat())
+            else:
+                self.enemies.append(Mushroom())
+            i += 1
+
+        self.curr_enemies = len(self.enemies)
+
+    def handle_enemies(self, char: Player) -> None:
+        for enemy in self.enemies:
+            if enemy.remove:
+                self.enemies.remove(enemy)
+            else:
+                enemy.animate(char.rect.x, char.rect.y)
+                enemy.move(char.rect.centerx, char.rect.centery)
+                char.check_damage(enemy)
+
+        self.curr_enemies = len(self.enemies)
+
+        if not self.wave_complete:
+            self._wave_status()
+
+    def _wave_status(self) -> None:
+        if len(self.enemies) == 0:
+            self.wave_complete = True
+            self.wave_commenced = False
+            self._last_update_complete = pygame.time.get_ticks()
+            WAVE_FINISH.play()
+
+    def enemy_animations(self) -> None:
+        for enemy in self.enemies:
+            if not enemy.dead:
+                WINDOW.blit(enemy.curr_sprite, (enemy.rect.x, enemy.rect.y))
+                enemy.draw_health(WINDOW)
+                if enemy.play_hit_animation:
+                    enemy.hit_animation(WINDOW)
+            else:
+                enemy.death_animation(WINDOW)
+
+    def wave_complete_anim(self) -> None:
+        complete_text_back = FONT_BOLD_LARGE.render('WAVE COMPLETE!', False, BLACK)
+        WINDOW.blit(complete_text_back, (410, 605))
+        complete_text = FONT_BOLD_LARGE.render('WAVE COMPLETE!', False, WHITE)
+        WINDOW.blit(complete_text, (415, 600))
+        
+        now = pygame.time.get_ticks()
+        if now - self._last_update_complete > 4000:
+            self.wave_complete = False
+            self.begin = False
+
+    def show_remaining(self) -> None:
+        remaining_text = FONT.render('Enemies Remaining: ' + str(self.curr_enemies), False, WHITE)
+        WINDOW.blit(remaining_text, (375, 670))
+
+
+def draw_window(wave: Wave, char: Player, rotation: float):
     WINDOW.blit(BACKGROUND, (0, 0))
     WINDOW.blit(PLATFORM, PLATFORM_RECT.topleft)
     WINDOW.blit(CHEST, (WIDTH // 2 - 33, 60))
     curr_char = char.get_rotated(rotation)
-    char.draw_bullets(enemies)
+    char.draw_bullets(wave.enemies)
     WINDOW.blit(curr_char, char.rect.topleft)
-    for enemy in enemies:
-        if not enemy.dead:
-            WINDOW.blit(enemy.curr_sprite, (enemy.rect.x, enemy.rect.y))
-            enemy.draw_health(WINDOW)
-            if enemy.play_hit_animation:
-                enemy.hit_animation(WINDOW)
-        else:
-            enemy.death_animation(WINDOW)
+    wave.enemy_animations()
     WINDOW.blit(BAR, (0, HEIGHT - 50))
     WINDOW.blit(HEALTH, (WIDTH - 355, HEIGHT - 35))
     char.check_buy()
     char.draw_hearts()
     char.display_money()
     char.draw_ammo()
+    if not wave.begin:
+        wave.request_wave_start()
+    elif wave.start_wave_anim:
+        wave.wave_start_animation()
+    elif wave.wave_commenced:
+        wave.show_remaining()
+    elif wave.wave_complete:
+        wave.wave_complete_anim()
     pygame.display.update()
 
 
@@ -994,7 +1140,7 @@ def main():
     run = True
     clock = pygame.time.Clock()
     char = Player()
-    enemies = [Mushroom(), Worm()]
+    wave = Wave()
     pygame.mixer.music.load('Assets/sounds/background_music.wav')
     pygame.mixer.music.set_volume(0.6)
     pygame.mixer.music.play(-1)
@@ -1010,6 +1156,8 @@ def main():
                 if event.button == 1:
                     char.shoot_bullet(mx, my)
             if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE and not wave.begin:
+                    wave.begin_waves()
                 if event.key == pygame.K_r and char.need_reload:
                     char.reload()
                 if event.key == pygame.K_b and char.at_buy_platform and char.has_funds:
@@ -1019,15 +1167,10 @@ def main():
         char.move(key_pressed)
         char.update_health()
 
-        for enemy in enemies:
-            if enemy.remove:
-                enemies.remove(enemy)
-            else:
-                enemy.animate(char.rect.x, char.rect.y)
-                enemy.move(char.rect.centerx, char.rect.centery)
-                char.check_damage(enemy)
+        if wave.wave_commenced:
+            wave.handle_enemies(char)
 
-        draw_window(char, rotation, enemies)
+        draw_window(wave, char, rotation)
     pygame.quit()
 
 
