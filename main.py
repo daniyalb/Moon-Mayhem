@@ -1,6 +1,6 @@
-from re import I
-from numpy import square
-import pygame, math, random
+import pygame
+import math
+import random
 
 pygame.init()
 WIDTH, HEIGHT = 1280, 720
@@ -14,8 +14,10 @@ HEALTH = pygame.transform.scale(pygame.image.load('Assets/misc/health_title.png'
                                                   ), (103, 19))
 HEART = pygame.transform.scale(pygame.image.load('Assets/misc/heart.png'), (32,
                                                                             32))
-CHEST = pygame.transform.scale(pygame.image.load('Assets/misc/chest.png'), (66, 64))
-PLATFORM = pygame.transform.scale(pygame.image.load('Assets/misc/platform.png'), (188, 144))
+CHEST = pygame.transform.scale(pygame.image.load('Assets/misc/chest.png'), (66,
+                                                                            64))
+PLATFORM = pygame.transform.scale(pygame.image.load('Assets/misc/platform.png'),
+                                  (188, 144))
 PLATFORM_RECT = PLATFORM.get_rect()
 PLATFORM_RECT.topleft = (WIDTH // 2 - 94, 30)
 LASER_SOUND = pygame.mixer.Sound('Assets/sounds/laser_sound.wav')
@@ -30,12 +32,13 @@ CHARACTER_STILL = pygame.image.load('Assets/character/char_still.png')
 CHARACTER_RIGHT = pygame.image.load('Assets/character/char_right.png')
 CHARACTER_LEFT = pygame.image.load('Assets/character/char_left.png')
 CHAR_HIT = pygame.mixer.Sound('Assets/sounds/player_hit.wav')
+CHAR_HIT.set_volume(0.5)
 NO_AMMO = pygame.mixer.Sound('Assets/sounds/no_ammo.wav')
 CHAR_DIM = 128
 SPEED = 5
 BULL_VEL = 6
 GUN_AMMO = 32
-AMMO_COST = 20
+AMMO_COST = 30
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 YELLOW = (255, 255, 0)
@@ -50,38 +53,48 @@ FONT_BOLD = pygame.font.Font('Assets/misc/bold_font.ttf', 34)
 FONT_BOLD_LARGE = pygame.font.Font('Assets/misc/bold_font.ttf', 54)
 
 
-def init_enemy_sprites() -> tuple[list]:
-    """ Initialize the sprites for enemies as well as their animations and return
-    them in a tuple of lists.
+def init_enemy_sprites() -> tuple:
+    """ Initialize the sprites for enemies as well as their animations and
+    return them in a tuple of lists.
     """
     worm_sprites = get_sprites(9, 'Assets/enemies/worm/worm', '.png', 100, 100)
     bat_sprites = get_sprites(8, 'Assets/enemies/bat/bat', '.png', 82, 66)
-    mushroom_sprites = get_sprites(8, 'Assets/enemies/mushroom/mushroom', '.png', 63, 98)
-    mushroom_explode_sprites = get_sprites(4, 'Assets/enemies/mushroom/exploding/explode',
-                                             '.png', 63, 98)
-    explosion_sprites = get_sprites(12, 'Assets/enemies/mushroom/explosion/explosion', '.png', 189, 192)
+    mushroom_sprites = get_sprites(8, 'Assets/enemies/mushroom/mushroom',
+                                   '.png', 63, 98)
+    mushroom_explode_sprites = \
+        get_sprites(4, 'Assets/enemies/mushroom/exploding/explode', '.png',
+                    63, 98)
+    explosion_sprites = \
+        get_sprites(12, 'Assets/enemies/mushroom/explosion/explosion', '.png',
+                    189, 192)
     hit_sprites = get_sprites(28, 'Assets/enemies/enemy_hit/', '.png', 300, 300)
-    death_sprites = get_sprites(30, 'Assets/enemies/enemy_death/', '.png', 300, 300)
+    death_sprites = get_sprites(30, 'Assets/enemies/enemy_death/', '.png',
+                                300, 300)
 
-    return (worm_sprites, bat_sprites, mushroom_sprites, mushroom_explode_sprites, explosion_sprites, hit_sprites, death_sprites)
+    return (worm_sprites, bat_sprites, mushroom_sprites,
+            mushroom_explode_sprites, explosion_sprites, hit_sprites,
+            death_sprites)
 
 
-def get_sprites(number_images: int, dir: str, type: str, x_dim: int, y_dim: int) -> list:
-    """ A helper function for init_enemy_sprites() which takes the number of images 
-    <number_images> of the sprtie, the directory <dir> of these images, their file 
-    type <type>, as well as the x and y dimensions of the actual enemy sprite, 
-    <x_dim> and <y_dim> respectively. The function loads these images and adds them
-    to a list with the proper scaling, and returns this list.
+def get_sprites(number_images: int, directory: str, f_type: str, x_dim: int,
+                y_dim: int) -> list:
+    """ A helper function for init_enemy_sprites() which takes the number of
+    images <number_images> of the sprite, the directory <directory> of these
+    images, their file type <f_type>, as well as the x and y dimensions of the
+    actual enemy sprite, <x_dim> and <y_dim> respectively. The function loads
+    these images and adds them to a list with the proper scaling, and returns
+    this list.
     """
     sprite_list = []
     for i in range(1, number_images + 1):
-        sprite = pygame.image.load(dir + str(i) + type)
+        sprite = pygame.image.load(directory + str(i) + f_type)
         sprite = pygame.transform.scale(sprite, (x_dim, y_dim))
         sprite_list.append(sprite)
     return sprite_list
 
 
-WORM_SPRITES, BAT_SPRITES, MUSHROOM_SPRITES, MUSHROOM_EXPLODE_SPRITES, EXPLOSION_SPRTIES, HIT_SPRITES, DEATH_SPRITES = init_enemy_sprites()
+(WORM_SPRITES, BAT_SPRITES, MUSHROOM_SPRITES, MUSHROOM_EXPLODE_SPRITES,
+ EXPLOSION_SPRITES, HIT_SPRITES, DEATH_SPRITES) = init_enemy_sprites()
 ENEMY_HIT = pygame.mixer.Sound('Assets/sounds/enemy_hit.wav')
 ENEMY_DEATH = pygame.mixer.Sound('Assets/sounds/enemy_death.wav')
 ENEMY_SPEED = 1
@@ -89,24 +102,23 @@ ENEMY_SPEED = 1
 
 class Bullet:
     """ The bullet class in this game.
-    
+
     This class handles the creation of a bullet to be used in the Player
     class.
 
     === Public Attributes ===
-    rect: 
+    rect:
          the pygame rectangle for this bullet
     x_vel:
          The velocity of this bullet in the x direction
     y_vel:
          The velocity of this bullet in the y direction
     """
-
     rect: pygame.Rect
     x_vel: float
     y_vel: float
 
-    def __init__(self, char_center, mx, my) -> None:
+    def __init__(self, char_center: tuple[int, int], mx: int, my: int) -> None:
         self.rect = LASER.get_rect()
         x, y = char_center
         self.rect.center = char_center
@@ -120,8 +132,9 @@ class Player:
     """ The player character in the game.
 
     This class handles the drawing and movement of the character in the game, as
-    well as the amount of ammo they have, money they've earned, and waves
-    they've survived.
+    well as the amount of ammo they have, money they've earned, purchasing of
+    ammo, shooting of bullets, bullet collisions with enemies, reloading of
+    ammo, and the amount of health the player has and regeneration of it.
 
     === Public Attributes ==
     sprite:
@@ -185,6 +198,8 @@ class Player:
     _money_gain: list[tuple]
 
     def __init__(self) -> None:
+        """ Initialize the attributes for this player.
+        """
         self.sprite = CHARACTER_STILL
         self._move_sprites = [CHARACTER_RIGHT, CHARACTER_LEFT]
         self._curr_move_sprite = 0
@@ -206,9 +221,13 @@ class Player:
         self.has_funds = False
 
     def move(self, key_pressed) -> None:
-        """Move the character depending on which keys are pressed in key_pressed
+        """Move the character depending on which keys are pressed in
+        <key_pressed> by adding or subtracting the x or y value of their
+        <self.rect> position. Also handles the animation of the character if
+        they are moving.
         """
         moving = False
+
         if key_pressed[pygame.K_a] and self.rect.left >= 0:
             self.rect.centerx -= SPEED
             moving = True
@@ -221,14 +240,15 @@ class Player:
         if key_pressed[pygame.K_s] and self.rect.bottom <= HEIGHT - 50:
             self.rect.centery += SPEED
             moving = True
+
         if moving:
             self.animate()
         else:
             self.sprite = CHARACTER_STILL
 
     def animate(self) -> None:
-        """Animate the character by moving its legs when the character is
-        moving
+        """Animate the character by swapping between sprites of the character's
+        legs moving to simulate walking
         """
         now = pygame.time.get_ticks()
         if now - self._last_updated > 200:
@@ -238,23 +258,26 @@ class Player:
             self.sprite = self._move_sprites[self._curr_move_sprite]
 
     def _get_death_sprites(self) -> None:
-        """ Load in the sprites representing blood when the character dies
-        and place them all into a list <self._death_sprties>
+        """ Load in the sprites as pygame surfaces representing blood when the
+        character dies and place them all into a list <self._death_sprites>
         """
         self._death_sprites = []
         for i in range(1, 23):
-            sprite = pygame.image.load('Assets/character/character_death/' + str(
-                i) + '.png')
+            sprite = pygame.image.load('Assets/character/character_death/' +
+                                       str(i) + '.png')
             self._death_sprites.append(sprite)
 
     def get_rotated(self, rotation: float) -> pygame.Surface:
         """Rotate the character surface according to the <rotation> value and
-        return
-        this surface
+        return this surface
         """
         return pygame.transform.rotate(self.sprite, rotation)
 
     def _no_ammo(self) -> None:
+        """ A helper method for shoot_bullet() which determines if the player
+        has enough ammo to reload or is out of ammo and changes the appropriate
+        boolean variable to True.
+        """
         if self.ammo < 1:
             self.out_of_ammo = True
         else:
@@ -263,7 +286,12 @@ class Player:
         NO_AMMO.play()
 
     def shoot_bullet(self, mx: int, my: int) -> None:
-        """Handle the shooting of a bullet"""
+        """Handle the shooting of a bullet by creating a Bullet object which
+        contains the starting position of the bullet as well as the x and y
+        position of the mouse when the bullet is shot if the player has enough
+        ammo. If the player does not have enough ammo, determine what they need
+        to do by calling the _no_ammo() method.
+        """
         if self.curr_ammo > 0:
             bullet = Bullet(self.rect.center, mx, my)
             self.curr_ammo -= 1
@@ -275,24 +303,31 @@ class Player:
 
     def _handle_bullets(self, bullet: Bullet,
                         enemies: list) -> None:
-        """Handle bullet collisions
+        """ Handle bullet collisions, if the bullet leaves the screen, then
+        remove it from the self.bullets list. If not, check if the bullet has
+        collided with any of the currently alive enemies and remove the bullet
+        if it has, as well as damage the enemy. If the enemy dies from this
+        bullet collision, add money to this player.
         """
-        if bullet.rect.x <= 0 or bullet.rect.x >= WIDTH or bullet.rect.y <= 0 or \
-                bullet.rect.y >= HEIGHT:
+        if bullet.rect.x <= 0 or bullet.rect.x >= WIDTH or bullet.rect.y <= 0 \
+                or bullet.rect.y >= HEIGHT:
             self.bullets.remove(bullet)
         else:
             removed_once = False
             for enemy in enemies:
-                if not removed_once and enemy.rect.colliderect(bullet.rect) and not enemy.dead:
+                if not removed_once and enemy.rect.colliderect(bullet.rect) and\
+                        not enemy.dead:
                     enemy.damage()
                     if enemy.dead:
                         self.add_money()
-                        self._money_gain.append((enemy.rect.x, enemy.rect.y, 100))
+                        self._money_gain.append((enemy.rect.x, enemy.rect.y,
+                                                 100))
                     self.bullets.remove(bullet)
                     removed_once = True
 
     def draw_bullets(self, enemies: list) -> None:
-        """Draws the bullets at their current location
+        """ Moves bullets according to they x and y velocity and draws the
+        bullets at their current location.
         """
         for bullet in self.bullets:
             bullet.rect.x -= bullet.x_vel
@@ -301,19 +336,29 @@ class Player:
             self._handle_bullets(bullet, enemies)
 
     def draw_ammo(self) -> None:
-        ammo_text = FONT.render('Ammo: ' + str(self.curr_ammo) + ' / ' + str(GUN_AMMO), False, WHITE)
+        """ Handles the drawing of the amount of current ammo and total ammo on
+        the bottom right of the screen. Also draws messages to reload or buy
+        ammo if this is required.
+        """
+        ammo_text = FONT.render('Ammo: ' + str(self.curr_ammo) + ' / ' +
+                                str(GUN_AMMO), False, WHITE)
         WINDOW.blit(ammo_text, (WIDTH - 225, HEIGHT - 130))
-        total_text = FONT_SMALL.render('Total Ammo: ' + str(self.ammo), False, WHITE)
+        total_text = FONT_SMALL.render('Total Ammo: ' + str(self.ammo), False,
+                                       WHITE)
         WINDOW.blit(total_text, (WIDTH - 195, HEIGHT - 90))
 
         if self.need_reload:
             reload_text = FONT_SMALL.render('PRESS "R" TO RELOAD!', False, RED)
             WINDOW.blit(reload_text, (WIDTH - 235, HEIGHT - 155))
         elif self.out_of_ammo:
-            reload_text = FONT_SMALL.render('OUT OF AMMO! BUY MORE!', False, RED)
+            reload_text = FONT_SMALL.render('OUT OF AMMO! BUY MORE!', False,
+                                            RED)
             WINDOW.blit(reload_text, (WIDTH - 285, HEIGHT - 155))
 
     def reload(self) -> None:
+        """ Reload this player's ammo to the appropriate amount, and make the
+        boolean self.need_reload False.
+        """
         if self.ammo <= 32:
             self.curr_ammo += self.ammo
         else:
@@ -323,7 +368,8 @@ class Player:
         RELOAD_SOUND.play()
 
     def draw_hearts(self) -> None:
-        """Display the hearts representing the player's health
+        """ Display the hearts representing the player's health on the bottom
+        right of the screen.
         """
         x, y = WIDTH - 48, HEIGHT - 40
         for i in range(1, self.health + 1):
@@ -332,11 +378,12 @@ class Player:
 
     def check_damage(self, enemy) -> None:
         """ Check if this <enemy> has collided with the player, and if they
-        did, lower the players health"""
+        did, lower the player's health.
+        """
         now = pygame.time.get_ticks()
 
         if isinstance(enemy, Mushroom) and self.rect.colliderect(enemy) and \
-             enemy.exploded and not enemy.player_damaged:
+                enemy.exploded and not enemy.player_damaged:
             self.health -= enemy.player_damage
             enemy.player_damaged = True
         elif now - self._last_update_damage > 1000:
@@ -346,8 +393,8 @@ class Player:
                 self._last_update_damage = now
 
     def update_health(self) -> None:
-        """ Use a clock to determine when the player's health should be increased
-        and only increase health if self.health < 5
+        """ Use a clock to determine when the player's health should be
+        increased and only increase health if self.health < 5.
         """
         now = pygame.time.get_ticks()
         if now - self._last_update_health > 3000:
@@ -356,43 +403,62 @@ class Player:
                 self.health += 1
 
     def add_money(self) -> None:
-        """ Add money to this player for killing an enemy
+        """ Add money to this player for killing an enemy.
         """
         self.money += 10
 
     def display_money(self) -> None:
+        """ Display text indicating the amount of money this player has on the
+        bottom left of the screen, as well as indicators of money gained at the
+        location enemies were killed at.
+        """
         money_text = FONT.render('Money: $' + str(self.money), False, WHITE)
         WINDOW.blit(money_text, (20, HEIGHT - 50))
 
         for i in range(len(self._money_gain)):
             kill_text = FONT_SMALL.render('+ $10', False, YELLOW)
-            WINDOW.blit(kill_text, (self._money_gain[i][0], self._money_gain[i][1]))
-            self._money_gain[i] = (self._money_gain[i][0], self._money_gain[i][1], self._money_gain[i][2] - 1)
+            WINDOW.blit(kill_text, (self._money_gain[i][0],
+                                    self._money_gain[i][1]))
+            self._money_gain[i] = (self._money_gain[i][0],
+                                   self._money_gain[i][1],
+                                   self._money_gain[i][2] - 1)
 
         for kill in self._money_gain:
             if kill[2] == 0:
                 self._money_gain.remove(kill)
 
     def check_buy(self) -> None:
+        """ Determine if the player is standing on the buy platform, and display
+        an appropriate message to either buy ammo or inform the player that they
+        do not have enough money for ammo.
+        """
         self.at_buy_platform = False
         self.has_funds = False
 
         if self.rect.colliderect(PLATFORM_RECT):
             if self.money >= AMMO_COST:
-                buy_text = FONT_SMALL.render('PRESS "B" TO BUY ' + str(GUN_AMMO) + ' AMMO ($' + str(AMMO_COST) + ')', False, YELLOW)
+                buy_text = FONT_SMALL.render('PRESS "B" TO BUY ' + str(GUN_AMMO)
+                                             + ' AMMO ($' + str(AMMO_COST) +
+                                             ')', False, YELLOW)
                 x, y = PLATFORM_RECT.bottomleft
                 x -= 70
                 WINDOW.blit(buy_text, (x, y))
                 self.at_buy_platform = True
                 self.has_funds = True
             else:
-                no_fund_text = FONT_SMALL.render('NOT ENOUGH MONEY FOR AMMO, NEED $' + str(AMMO_COST), False, YELLOW)
+                no_fund_text = FONT_SMALL.render('NOT ENOUGH MONEY FOR AMMO,' +
+                                                 ' NEED $' + str(AMMO_COST),
+                                                 False, YELLOW)
                 x, y = PLATFORM_RECT.bottomleft
                 x -= 130
                 WINDOW.blit(no_fund_text, (x, y))
                 self.at_buy_platform = True
 
     def buy_ammo(self) -> None:
+        """ Handles the purchasing of ammo by adding to this player's amount of
+        ammo, reducing their money, and making the boolean indicator for no
+        ammo false.
+        """
         self.ammo += GUN_AMMO
         self.curr_ammo = GUN_AMMO
         self.money -= AMMO_COST
@@ -420,7 +486,7 @@ class Enemy:
          A boolean indicating whether the enemy is dead (True) or alive (false)
     remove:
          A boolean indicating whether this enemy should be removed from the
-         enemy list in the main() function
+         enemy list in the Wave class
     player_damage:
          The amount of damage this enemy causes to the player
     """
@@ -437,7 +503,7 @@ class Enemy:
     #     An integer meant to signify the index of which sprite in
     #     <_enemy_sprites> is selected
     # _hit_sprites:
-    #     A list of sprites representing the blood when this enemy is hot
+    #     A list of sprites representing the blood when this enemy is hit
     # _death_sprites:
     #    A list of sprites representing the blood when this enemy dies
     # _last_update_hit:
@@ -476,6 +542,8 @@ class Enemy:
     _hit_sprites: list[pygame.Surface]
 
     def __init__(self) -> None:
+        """ Initialize the attributes for this enemy.
+        """
         self._last_updated = 0
         self._curr_frame_sprite = 0
         self._last_update_hit = 0
@@ -493,7 +561,7 @@ class Enemy:
         self.play_hit_animation = False
 
     def spawn(self) -> None:
-        """ Spawn in this enemy somewhere outside of the viewable screen
+        """ Spawn in this enemy at a random location outside the viewable screen
         """
         x, y = 0, 0
         while (0 <= x <= WIDTH) and (0 <= y <= HEIGHT):
@@ -502,7 +570,8 @@ class Enemy:
         self.rect.center = (x, y)
 
     def damage(self) -> None:
-        """ Register the fact that this enemy was damaged
+        """ Register the fact that this enemy was damaged by reducing
+        <self.health>, also determine if the enemy has died.
         """
         self.health -= 1
         ENEMY_HIT.play()
@@ -513,6 +582,11 @@ class Enemy:
             self.play_hit_animation = True
 
     def draw_health(self, window: pygame.Surface) -> None:
+        """ Draw a rectangle underneath the enemy which displays the amount of
+        health it has remaining. This method moves this bar to keep it under the
+        enemy, and updates it by changing how it looks to show what level of
+        health the enemy is at.
+        """
         x1, y1 = self.rect.bottomleft
         x1 += 16
         y1 += 6
@@ -533,8 +607,10 @@ class Enemy:
         else:
             pygame.draw.line(window, GREEN, (x1, y1), (x2, y2), 4)
 
-    def animate(self, x: int, y: int) -> None:
-        """ Animate the enemy by cycling through it's animation as it moves
+    def animate(self, x: int) -> None:
+        """ Animate the enemy by cycling through its animation as it moves.
+        Also flip the pygame surface of this enemy to face them towards the
+        player.
         """
         now = pygame.time.get_ticks()
 
@@ -558,6 +634,9 @@ class Enemy:
                 self._facing = 'right'
 
     def hit_animation(self, window: pygame.Surface) -> None:
+        """ When this enemy is hit by a bullet, this method plays an animation
+        of a blood splatter at the location where the enemy was hit.
+        """
         now = pygame.time.get_ticks()
 
         if now - self._last_update_hit > 25:
@@ -574,6 +653,11 @@ class Enemy:
             self.play_hit_animation = False
 
     def death_animation(self, window: pygame.Surface) -> None:
+        """ Once this enemy is killed, this method plays an animation of a blood
+         splatter where the enemy died. It then sets <self.remove> to True to
+         indicate to the Wave class to remove this enemy from its self.enemies
+         list.
+         """
         now = pygame.time.get_ticks()
 
         if now - self._last_update_dead > 25:
@@ -593,8 +677,8 @@ class Enemy:
 class Worm(Enemy):
     """The Worm Enemy class for this game.
 
-    This class handles the drawing of, spawning in, and health and damage
-    caused by this enemy.
+    This class handles the drawing of, spawning in, movement, health, damage,
+    and animations of this enemy.
 
     === Public Attributes ===
     rect:
@@ -667,6 +751,11 @@ class Worm(Enemy):
     _hit_sprites: list[pygame.Surface]
 
     def __init__(self) -> None:
+        """ Initialize this worm enemy by calling on its super class and
+        instantiating further attributes including its sprites
+        <self.enemy_sprites>, current sprite <self.curr_sprite>, and its pygame
+        rectangle <self.rect>.
+        """
         Enemy.__init__(self)
         self._enemy_sprites = WORM_SPRITES
         self.curr_sprite = self._enemy_sprites[0]
@@ -674,6 +763,10 @@ class Worm(Enemy):
         self.spawn()
 
     def move(self, x: int, y: int) -> None:
+        """ Move this worm enemy towards the player's x and y coordinates by
+        adding or subtracting the enemy's speed from its rectangle's x and y
+        values.
+        """
         if self.rect.x <= x:
             self.rect.x += ENEMY_SPEED
         else:
@@ -688,8 +781,8 @@ class Worm(Enemy):
 class Bat(Enemy):
     """The Bat Enemy class for this game.
 
-    This class handles the drawing of, spawning in, and health and damage
-    caused by this enemy.
+    This class handles the drawing of, spawning in, movement, health, damage,
+    and animations of this enemy.
 
     === Public Attributes ===
     rect:
@@ -766,6 +859,14 @@ class Bat(Enemy):
     _hit_sprites: list[pygame.Surface]
 
     def __init__(self) -> None:
+        """ Initialize this bat enemy by calling on its super class and
+        instantiating further attributes including its sprites
+        <self.enemy_sprites>, current sprite <self.curr_sprite>, its pygame
+        rectangle <self.rect>, as well as attributes to track when it's movement
+        was last updated <self._last_update_movement>, the player's x and y
+        values <self._target_x> and <self._target_y>, and a variable to track
+        when movement should be updated <self._movement_update>.
+        """
         Enemy.__init__(self)
         self._enemy_sprites = BAT_SPRITES
         self.curr_sprite = self._enemy_sprites[0]
@@ -776,6 +877,10 @@ class Bat(Enemy):
         self.spawn()
 
     def move(self, x: int, y: int) -> None:
+        """ This method handles the movement of this bat enemy, which only
+        updates the coordinate that this enemy is moving towards after a
+        randomly selected amount of time.
+        """
         now = pygame.time.get_ticks()
 
         if now - self._last_update_movement > self._movement_update:
@@ -794,11 +899,12 @@ class Bat(Enemy):
         else:
             self.rect.y -= ENEMY_SPEED + 1
 
+
 class Mushroom(Enemy):
     """The Mushroom Enemy class for this game.
 
-    This class handles the drawing of, spawning in, and health and damage
-    caused by this enemy.
+    This class handles the drawing of, spawning in, movement, health, damage,
+    and animations of this enemy.
 
     === Public Attributes ===
     rect:
@@ -819,7 +925,7 @@ class Mushroom(Enemy):
     player_damage:
          The amount of damage this enemy causes to the player
     exploded:
-         A boolean which indicates whether this enemy has began their
+         A boolean which indicates whether this enemy has begun their
          explosion or not
     player_damaged:
          A boolean to track if this enemy's explosion has damaged the player
@@ -890,6 +996,13 @@ class Mushroom(Enemy):
     _hit_sprites: list[pygame.Surface]
 
     def __init__(self) -> None:
+        """ Initialize this Mushroom enemy by calling on the super class as well
+        as instantiating further variables such as the enemy's sprites, their
+        pygame rectangle, the current sprite, booleans to determine if this
+        enemy damaged a player, exploded, is close to the player, and changed
+        their sprite. Other attributes are instantiated to keep track of when
+        this enemy's explosion effect was last updated.
+        """
         Enemy.__init__(self)
         self._enemy_sprites = MUSHROOM_SPRITES
         self.curr_sprite = self._enemy_sprites[0]
@@ -903,6 +1016,11 @@ class Mushroom(Enemy):
         self.spawn()
 
     def move(self, x: int, y: int) -> None:
+        """ Move this enemy towards the player's current x and y coordinates
+        only if this enemy is not within a certain range of the player. If they
+        are, call on helper methods to change this enemy's sprite to their
+        explosion countdown sprites and start the explosion countdown.
+        """
         self._close_to_player(x, y)
 
         if not self._close:
@@ -919,9 +1037,9 @@ class Mushroom(Enemy):
             self._change_sprite()
             self._explode()
 
-    def _close_to_player(self, x: int, y: int) -> bool:
+    def _close_to_player(self, x: int, y: int) -> None:
         """ Return whether this mushroom enemy is close enough
-        to the player to explode
+        to the player to explode, within 100 pixels in any direction.
         """
         dx = abs(self.rect.x - x)
         dy = abs(self.rect.y - y)
@@ -930,9 +1048,9 @@ class Mushroom(Enemy):
             self._close = True
 
     def _change_sprite(self) -> None:
-        """ Change the enemies sprites in <self._enemy_sprites> to
-        a different list of sprites only once, also update the
-        <self._last_update_explode> timer to the current frame
+        """ Change the enemies sprites in <self._enemy_sprites> to a different
+        list of sprites only once, their explosion countdown sprites. Also
+        update the <self._last_update_explode> timer to the current frame.
         """
         if not self._sprite_changed:
             self._enemy_sprites = MUSHROOM_EXPLODE_SPRITES
@@ -942,14 +1060,15 @@ class Mushroom(Enemy):
 
     def _explode(self) -> None:
         """ A helper method that tracks the remaining frames left until
-        this enemy explodes
+        this enemy explodes.
         """
         now = pygame.time.get_ticks()
 
-        if now - self._last_update_explode > 3000 and not self.exploded and not self.dead:
+        if now - self._last_update_explode > 3000 and not self.exploded and \
+                not self.dead:
             self.player_damage = 3
             x, y = self.rect.center
-            self._death_sprites = EXPLOSION_SPRTIES
+            self._death_sprites = EXPLOSION_SPRITES
             self.rect = self._death_sprites[0].get_rect()
             self.rect.center = (x, y)
             EXPLOSION_SOUND.play()
@@ -957,10 +1076,16 @@ class Mushroom(Enemy):
             self.exploded = True
 
     def death_animation(self, window: pygame.Surface) -> None:
+        """ Swap through sprites which represent this enemy's death, an
+        explosion, and set <self.remove> to True once their death animation
+        has finished in order to indicate to the Wave class to remove this
+        enemy from its self.enemies list.
+        """
         TIMER_SOUND.stop()
         if self.exploded:
             now = pygame.time.get_ticks()
-            window.blit(self._death_sprites[self._curr_death_sprite], self.rect.topleft)
+            window.blit(self._death_sprites[self._curr_death_sprite],
+                        self.rect.topleft)
             if now - self._last_update_dead > 60:
                 self._last_update_dead = now
                 self._curr_death_sprite = (self._curr_death_sprite + 1) % len(
@@ -970,20 +1095,37 @@ class Mushroom(Enemy):
         else:
             Enemy.death_animation(self, window)
 
-    
+
 class Wave:
     """ The Wave class for this game.
-    
-    This class is responsible for the starting and ending of waves, 
-    determining the number of enemies to spawn, and tracking how many 
-    enemies are left.
+
+    This class is responsible for requesting the start of a wave, starting the
+    wave and determining the number of enemies to spawn, and tracking how many
+    enemies are left. It handles the enemies in the current wave by updating
+    their animations, movement, damage, and whether they are alive or dead. This
+    class also handles the animation of the on-screen messages to the player
+    about the wave.
 
     === Public Attributes ===
     wave:
          An integer which tracks which wave the game is currently on
     enemies:
-         A list of enemies of the Enemy class that are spawned in the 
+         A list of enemies of the Enemy class that are spawned in the
          current wave
+    begin:
+         A boolean which indicates whether the player has started the first
+         wave and therefore started up the wave progression
+    start_wave_anim:
+         A boolean which determines if the text animation should be played to
+         indicate the starting of a wave
+    wave_complete:
+         A boolean which indicates if a wave is complete, which happens when
+         there are no more enemies remaining
+    wave_commenced:
+         A boolean which tracks if a wave has begun and enemies have all been
+         spawned in
+    curr_enemies:
+         An integer which represents the number enemies remaining
     """
     # === Private Attributes ===
     # _last_update_start:
@@ -998,8 +1140,13 @@ class Wave:
     begin: bool
     start_wave_anim: bool
     wave_complete: bool
+    wave_commenced: bool
+    curr_enemies: int
+    _last_update_start: int
+    _last_update_complete: int
 
     def __init__(self) -> None:
+        """ Initialize the attributes for the Wave class"""
         self.wave = 0
         self.enemies = []
         self.begin = False
@@ -1011,10 +1158,16 @@ class Wave:
         self.curr_enemies = 0
 
     def begin_waves(self) -> None:
+        """ Set <self.begin> to true to indicate that waves have begun and
+        call start_wave() to set up the first wave.
+        """
         self.begin = True
         self.start_wave()
 
     def request_wave_start(self) -> None:
+        """ Display a message to the player to start the nth wave if they are
+        in between waves or have just loaded up the game.
+        """
         wave = str(self.wave + 1)
         if wave[-1] == '0':
             wave += 'TH'
@@ -1028,10 +1181,14 @@ class Wave:
             wave += 'RD'
         else:
             wave += 'TH'
-        wave_start_text = FONT_BOLD.render('PRESS "SPACEBAR" TO START THE ' + wave + ' WAVE', False, YELLOW)
+        wave_start_text = FONT_BOLD.render('PRESS "SPACEBAR" TO START THE ' +
+                                           wave + ' WAVE', False, YELLOW)
         WINDOW.blit(wave_start_text, (10, 620))
 
     def start_wave(self) -> None:
+        """ Start the wave by updating the wave number and calling on
+        _init_enemies() to choose and spawn in the enemies.
+        """
         self.wave += 1
         self.start_wave_anim = True
         self._init_enemies()
@@ -1040,16 +1197,25 @@ class Wave:
         WAVE_START.play()
 
     def wave_start_animation(self) -> None:
-        start_text_back = FONT_BOLD_LARGE.render('STARTING WAVE ' + str(self.wave), False, BLACK)
+        """ Display a message to the player indicating that the nth wave
+        has started and remove this message after some time.
+        """
+        start_text_back = FONT_BOLD_LARGE.render('STARTING WAVE ' + str(
+            self.wave), False, BLACK)
         WINDOW.blit(start_text_back, (410, 605))
-        start_text = FONT_BOLD_LARGE.render('STARTING WAVE ' + str(self.wave), False, WHITE)
+        start_text = FONT_BOLD_LARGE.render('STARTING WAVE ' + str(self.wave),
+                                            False, WHITE)
         WINDOW.blit(start_text, (415, 600))
-        
+
         now = pygame.time.get_ticks()
-        if now - self._last_update_start > 4000:
+        if now - self._last_update_start > 2500:
             self.start_wave_anim = False
 
     def _init_enemies(self) -> None:
+        """ Initialize the enemies by determining the amount to spawn in this
+        wave, then randomly select from the 3 types of enemies which to add
+        to the <self.enemies> list in order to spawn them in this round.
+        """
         num_enemies = self.wave + 2
         i = 0
         while i < num_enemies:
@@ -1065,11 +1231,15 @@ class Wave:
         self.curr_enemies = len(self.enemies)
 
     def handle_enemies(self, char: Player) -> None:
+        """ Handle the enemies by removing them from <self.enemies> if they
+        died, otherwise update their animations, movement, and check if they
+        damaged the player. This method also calls _wave_status().
+        """
         for enemy in self.enemies:
             if enemy.remove:
                 self.enemies.remove(enemy)
             else:
-                enemy.animate(char.rect.x, char.rect.y)
+                enemy.animate(char.rect.x)
                 enemy.move(char.rect.centerx, char.rect.centery)
                 char.check_damage(enemy)
 
@@ -1079,6 +1249,10 @@ class Wave:
             self._wave_status()
 
     def _wave_status(self) -> None:
+        """ This method determines if there are no remaining enemies and
+        declared if the wave is complete by changing <self.wave_complete> to
+        True and <self.wave_commenced> to False.
+        """
         if len(self.enemies) == 0:
             self.wave_complete = True
             self.wave_commenced = False
@@ -1086,6 +1260,10 @@ class Wave:
             WAVE_FINISH.play()
 
     def enemy_animations(self) -> None:
+        """ This method draws each enemy's sprite onto the screen along with
+        their hit animation if they were hurt. If the enemy dies, this method
+        draws their death animation.
+        """
         for enemy in self.enemies:
             if not enemy.dead:
                 WINDOW.blit(enemy.curr_sprite, (enemy.rect.x, enemy.rect.y))
@@ -1096,22 +1274,33 @@ class Wave:
                 enemy.death_animation(WINDOW)
 
     def wave_complete_anim(self) -> None:
-        complete_text_back = FONT_BOLD_LARGE.render('WAVE COMPLETE!', False, BLACK)
+        """ This method displays text on the screen indicating that a wave was
+        completed for a short amount of time.
+        """
+        complete_text_back = FONT_BOLD_LARGE.render('WAVE COMPLETE!', False,
+                                                    BLACK)
         WINDOW.blit(complete_text_back, (410, 605))
         complete_text = FONT_BOLD_LARGE.render('WAVE COMPLETE!', False, WHITE)
         WINDOW.blit(complete_text, (415, 600))
-        
+
         now = pygame.time.get_ticks()
-        if now - self._last_update_complete > 4000:
+        if now - self._last_update_complete > 2500:
             self.wave_complete = False
             self.begin = False
 
     def show_remaining(self) -> None:
-        remaining_text = FONT.render('Enemies Remaining: ' + str(self.curr_enemies), False, WHITE)
+        """ This method displays text on the screen that shows the amount of
+        enemies remaining in the current wave.
+        """
+        remaining_text = FONT.render('Enemies Remaining: ' + str(
+            self.curr_enemies), False, WHITE)
         WINDOW.blit(remaining_text, (375, 670))
 
 
 def draw_window(wave: Wave, char: Player, rotation: float):
+    """ This function is responsible for drawing every element of this game
+    onto the screen.
+    """
     WINDOW.blit(BACKGROUND, (0, 0))
     WINDOW.blit(PLATFORM, PLATFORM_RECT.topleft)
     WINDOW.blit(CHEST, (WIDTH // 2 - 33, 60))
@@ -1137,6 +1326,11 @@ def draw_window(wave: Wave, char: Player, rotation: float):
 
 
 def main():
+    """ This function contains the main game loop for this game and handles
+    creation of the player and the wave class. It also handles inputs to the
+    game, as well as the movement of the character, their health, and updating
+    the enemies in the game if they are spawned in.
+    """
     run = True
     clock = pygame.time.Clock()
     char = Player()
@@ -1160,7 +1354,8 @@ def main():
                     wave.begin_waves()
                 if event.key == pygame.K_r and char.need_reload:
                     char.reload()
-                if event.key == pygame.K_b and char.at_buy_platform and char.has_funds:
+                if event.key == pygame.K_b and char.at_buy_platform and \
+                        char.has_funds:
                     char.buy_ammo()
 
         key_pressed = pygame.key.get_pressed()
