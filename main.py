@@ -6,6 +6,18 @@ pygame.init()
 WIDTH, HEIGHT = 1280, 720
 WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 ICON = pygame.image.load('Assets/misc/icon.png')
+
+MENU_BG = pygame.image.load('Assets/menu/BG.png')
+START_BTN  = pygame.image.load('Assets/menu/Start_BTN.png')
+START_BTN_ACTIVE = pygame.image.load('Assets/menu/Start_BTN_A.png')
+EXIT_BTN = pygame.image.load('Assets/menu/Exit_BTN.png')
+EXIT_BTN_ACTIVE = pygame.image.load('Assets/menu/Exit_BTN_A.png')
+TUT_BTN = pygame.image.load('Assets/menu/Tut_BTN.png')
+TUT_BTN_ACTIVE = pygame.image.load('Assets/menu/Tut_BTN_A.png')
+TITLE = pygame.image.load('Assets/menu/title.png')
+MENU_MUSIC = pygame.mixer.Sound('Assets/sounds/menu.wav')
+HIGHLIGHT = pygame.mixer.Sound('Assets/sounds/highlight.wav')
+
 BACKGROUND = pygame.image.load('Assets/misc/background.jpg')
 BAR = pygame.image.load('Assets/misc/bar.png')
 BAR = pygame.transform.scale(BAR, (WIDTH, 50))
@@ -44,7 +56,7 @@ WHITE = (255, 255, 255)
 YELLOW = (255, 255, 0)
 RED = (255, 0, 0)
 GREEN = (0, 128, 0)
-pygame.display.set_caption("Moon Mayhem 2")
+pygame.display.set_caption("Moon Mayhem")
 pygame.display.set_icon(ICON)
 FPS = 60
 FONT = pygame.font.Font('Assets/misc/font.ttf', 34)
@@ -1366,8 +1378,92 @@ def main():
             wave.handle_enemies(char)
 
         draw_window(wave, char, rotation)
+
+
+def draw_menu(bg_rect, bg_rect2, start_btn, start_btn_a, exit_btn, exit_btn_a, start_active, exit_active):
+    WINDOW.blit(MENU_BG, bg_rect.topleft)
+    WINDOW.blit(MENU_BG, bg_rect2.topleft)
+    if start_active:
+        WINDOW.blit(START_BTN_ACTIVE, start_btn.topleft)
+    else:
+        WINDOW.blit(START_BTN, start_btn.topleft)
+    if exit_active:
+        WINDOW.blit(EXIT_BTN_ACTIVE, exit_btn.topleft)
+    else:
+        WINDOW.blit(EXIT_BTN, exit_btn.topleft)
+    WINDOW.blit(TITLE, (WIDTH // 2 - 282, 50))
+    pygame.display.update()
+
+
+def move_bg(bg_rect, bg_rect2):
+    """ Move the background.
+    """
+    bg_rect.y -= 1
+    bg_rect2.y -= 1
+    if bg_rect.bottomleft == (0, -1):
+        bg_rect.topleft = (0, 2277)
+    elif bg_rect2.bottomleft == (0, -1):
+        bg_rect2.topleft = (0, 2277)
+
+
+def main_menu():
+    """ The main menu for this game.
+    """
+    run = True
+    clock = pygame.time.Clock()
+    bg_rect = MENU_BG.get_rect()
+    bg_rect.topleft = (0, 0)
+    bg_rect2 = MENU_BG.get_rect()
+    bg_rect2.topleft = (0, 2277)
+    start_btn = START_BTN.get_rect()
+    start_btn_a = START_BTN_ACTIVE.get_rect()
+    start_btn.center = (WIDTH // 2, HEIGHT // 2 + 50)
+    start_btn_a.center = (WIDTH // 2, HEIGHT // 2 + 50)
+    exit_btn = EXIT_BTN.get_rect()
+    exit_btn_a = EXIT_BTN_ACTIVE.get_rect()
+    exit_btn.center = (WIDTH // 2, HEIGHT // 2 + 200)
+    exit_btn_a.center = (WIDTH // 2, HEIGHT // 2 + 200)
+    start_active = False
+    exit_active = False
+    playing = False
+    click = False
+    MENU_MUSIC.play(-1)
+
+    while run:
+        clock.tick(FPS)
+        mx, my = pygame.mouse.get_pos()
+        mx = float(mx)
+        my = float(my)
+        move_bg(bg_rect, bg_rect2)
+        draw_menu(bg_rect, bg_rect2, start_btn, start_btn_a, exit_btn, exit_btn_a, start_active, exit_active)
+        if start_btn.collidepoint(mx, my):
+            start_active = True
+            if not playing:
+                HIGHLIGHT.play()
+            playing = True
+            if click:
+                MENU_MUSIC.stop()
+                main()
+                run = False
+        elif exit_btn.collidepoint(mx, my):
+            exit_active = True
+            if not playing:
+                HIGHLIGHT.play()
+            playing = True
+            if click:
+                run = False
+        else:
+            start_active = False
+            exit_active = False
+            playing = False
+        click = False
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    click = True
     pygame.quit()
 
-
 if __name__ == "__main__":
-    main()
+    main_menu()
