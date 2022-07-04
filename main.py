@@ -45,6 +45,7 @@ CHARACTER_RIGHT = pygame.image.load('Assets/character/char_right.png')
 CHARACTER_LEFT = pygame.image.load('Assets/character/char_left.png')
 CHAR_HIT = pygame.mixer.Sound('Assets/sounds/player_hit.wav')
 CHAR_HIT.set_volume(0.5)
+CHAR_DEATH = pygame.mixer.Sound('Assets/sounds/player_dead.wav')
 NO_AMMO = pygame.mixer.Sound('Assets/sounds/no_ammo.wav')
 CHAR_DIM = 128
 SPEED = 5
@@ -169,6 +170,12 @@ class Player:
     at_buy_platform:
          A boolean variable to track if the player is standing within the
          buy platform
+    dead:
+         A boolean which tracks if this player is currently alive (False), or
+         dead (True)
+    full_dead:
+         A boolean which shows if this player's death animation is complete
+         (True) and that options to quit and retry the game can be shown
     """
     # === Private Attributes ==
     # _move_sprites:
@@ -189,6 +196,12 @@ class Player:
     # _money_gain:
     #     A list containing tuples indicating where an enemy was killed in
     #     order to display the money gained for this kill at that spot
+    # _last_update_dead:
+    #    An integer which tracks the last frame when this player's death
+    #    animation was updated
+    # _curr_death_sprite:
+    #    An integer which tracks the index of the death sprite is currently 
+    #    being displayed in the list of <_death_sprites>
 
     sprite: pygame.Surface
     rect: pygame.Rect
@@ -201,12 +214,16 @@ class Player:
     out_of_ammo: bool
     at_buy_platform: bool
     has_funds: bool
+    dead: bool
+    full_dead: bool
     _move_sprites: list[pygame.Surface]
     _curr_move_sprite: int
+    _curr_death_sprite: int
     _death_sprites: list[pygame.Surface]
     _last_updated: int
     _last_update_damage: int
     _last_update_health: int
+    _last_update_dead: int
     _money_gain: list[tuple]
 
     def __init__(self) -> None:
@@ -215,12 +232,14 @@ class Player:
         self.sprite = CHARACTER_STILL
         self._move_sprites = [CHARACTER_RIGHT, CHARACTER_LEFT]
         self._curr_move_sprite = 0
+        self._curr_death_sprite = 0
         self._get_death_sprites()
         self.rect = self.sprite.get_rect()
         self.rect.center = (WIDTH // 2, HEIGHT // 2)
         self._last_updated = 0
         self._last_update_damage = 0
         self._last_update_health = 0
+        self._last_update_dead = 0
         self._money_gain = []
         self.bullets = []
         self.health = 5
@@ -231,6 +250,8 @@ class Player:
         self.out_of_ammo = False
         self.at_buy_platform = False
         self.has_funds = False
+        self.dead = False
+        self.full_dead = False
 
     def move(self, key_pressed) -> None:
         """Move the character depending on which keys are pressed in
@@ -277,6 +298,7 @@ class Player:
         for i in range(1, 23):
             sprite = pygame.image.load('Assets/character/character_death/' +
                                        str(i) + '.png')
+            sprite = pygame.transform.scale(sprite, (256, 256))
             self._death_sprites.append(sprite)
 
     def get_rotated(self, rotation: float) -> pygame.Surface:
@@ -403,6 +425,11 @@ class Player:
                 self.health -= enemy.player_damage
                 CHAR_HIT.play()
                 self._last_update_damage = now
+        
+        if self.health <= 0:
+            self.dead = True
+            pygame.mixer.music.stop()
+            CHAR_DEATH.play()
 
     def update_health(self) -> None:
         """ Use a clock to determine when the player's health should be
@@ -476,6 +503,24 @@ class Player:
         self.money -= AMMO_COST
         self.out_of_ammo = False
         BUY_SOUND.play()
+
+    def death_animation(self) -> None:
+        """ Plays this player's death animation by swapping through the pygame
+        surfaces representing the player's blood splat and setting those as
+        the current death sprite to blit onto the screen
+        """
+        now = pygame.time.get_ticks()
+
+        if now - self._last_update_dead > 50:
+            self._last_update_dead = now
+            self._curr_death_sprite = (self._curr_death_sprite + 1) % len(
+                self._death_sprites)
+
+        x, y = self.rect.topleft
+        WINDOW.blit(self._death_sprites[self._curr_death_sprite], (x, y))
+
+        if self._curr_death_sprite == 21:
+            self.full_dead = True
 
 
 class Enemy:
@@ -1252,8 +1297,9 @@ class Wave:
                 self.enemies.remove(enemy)
             else:
                 enemy.animate(char.rect.x)
-                enemy.move(char.rect.centerx, char.rect.centery)
-                char.check_damage(enemy)
+                if not char.dead:
+                    enemy.move(char.rect.centerx, char.rect.centery)
+                    char.check_damage(enemy)
 
         self.curr_enemies = len(self.enemies)
 
@@ -1318,7 +1364,10 @@ def draw_window(wave: Wave, char: Player, rotation: float):
     WINDOW.blit(CHEST, (WIDTH // 2 - 33, 60))
     curr_char = char.get_rotated(rotation)
     char.draw_bullets(wave.enemies)
-    WINDOW.blit(curr_char, char.rect.topleft)
+    if not char.dead:
+        WINDOW.blit(curr_char, char.rect.topleft)
+    elif not char.full_dead:
+        char.death_animation()
     wave.enemy_animations()
     WINDOW.blit(BAR, (0, HEIGHT - 50))
     WINDOW.blit(HEALTH, (WIDTH - 355, HEIGHT - 35))
@@ -1359,20 +1408,21 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
+                if event.button == 1 and not char.dead:
                     char.shoot_bullet(mx, my)
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and not wave.begin:
                     wave.begin_waves()
-                if event.key == pygame.K_r and char.need_reload:
+                if event.key == pygame.K_r and char.need_reload and not char.dead:
                     char.reload()
                 if event.key == pygame.K_b and char.at_buy_platform and \
-                        char.has_funds:
+                        char.has_funds and not char.dead:
                     char.buy_ammo()
 
         key_pressed = pygame.key.get_pressed()
-        char.move(key_pressed)
-        char.update_health()
+        if not char.dead:
+            char.move(key_pressed)
+            char.update_health()
 
         if wave.wave_commenced:
             wave.handle_enemies(char)
@@ -1380,7 +1430,7 @@ def main():
         draw_window(wave, char, rotation)
 
 
-def draw_menu(bg_rect, bg_rect2, start_btn, start_btn_a, exit_btn, exit_btn_a, start_active, exit_active):
+def draw_menu(bg_rect, bg_rect2, start_btn, exit_btn, start_active, exit_active):
     WINDOW.blit(MENU_BG, bg_rect.topleft)
     WINDOW.blit(MENU_BG, bg_rect2.topleft)
     if start_active:
@@ -1416,13 +1466,9 @@ def main_menu():
     bg_rect2 = MENU_BG.get_rect()
     bg_rect2.topleft = (0, 2277)
     start_btn = START_BTN.get_rect()
-    start_btn_a = START_BTN_ACTIVE.get_rect()
     start_btn.center = (WIDTH // 2, HEIGHT // 2 + 50)
-    start_btn_a.center = (WIDTH // 2, HEIGHT // 2 + 50)
     exit_btn = EXIT_BTN.get_rect()
-    exit_btn_a = EXIT_BTN_ACTIVE.get_rect()
     exit_btn.center = (WIDTH // 2, HEIGHT // 2 + 200)
-    exit_btn_a.center = (WIDTH // 2, HEIGHT // 2 + 200)
     start_active = False
     exit_active = False
     playing = False
@@ -1435,7 +1481,7 @@ def main_menu():
         mx = float(mx)
         my = float(my)
         move_bg(bg_rect, bg_rect2)
-        draw_menu(bg_rect, bg_rect2, start_btn, start_btn_a, exit_btn, exit_btn_a, start_active, exit_active)
+        draw_menu(bg_rect, bg_rect2, start_btn, exit_btn, start_active, exit_active)
         if start_btn.collidepoint(mx, my):
             start_active = True
             if not playing:
