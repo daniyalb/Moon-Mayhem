@@ -1,12 +1,15 @@
 import pygame
 import math
 import random
-
+# Main game variables
 pygame.init()
 WIDTH, HEIGHT = 1280, 720
 WINDOW = pygame.display.set_mode((WIDTH, HEIGHT))
 ICON = pygame.image.load('Assets/misc/icon.png')
-
+pygame.display.set_caption("Moon Mayhem")
+pygame.display.set_icon(ICON)
+FPS = 60
+# Main menu variables
 MENU_BG = pygame.image.load('Assets/menu/BG.png')
 START_BTN  = pygame.image.load('Assets/menu/Start_BTN.png')
 START_BTN_ACTIVE = pygame.image.load('Assets/menu/Start_BTN_A.png')
@@ -17,11 +20,19 @@ TUT_BTN_ACTIVE = pygame.image.load('Assets/menu/Tut_BTN_A.png')
 TITLE = pygame.image.load('Assets/menu/title.png')
 MENU_MUSIC = pygame.mixer.Sound('Assets/sounds/menu.wav')
 HIGHLIGHT = pygame.mixer.Sound('Assets/sounds/highlight.wav')
-
+GAME_START = pygame.mixer.Sound('Assets/sounds/game_start.wav')
+# Game over menu variables
+GAME_OVER_TEXT = pygame.image.load('Assets/game_over/g_over_text.png')
+GAME_OVER_BG = pygame.image.load('Assets/game_over/g_over_bg.png')
+GAME_OVER_MUSIC = pygame.mixer.Sound('Assets/sounds/g_over.wav')
+REPLAY_BTN = pygame.image.load('Assets/game_over/Replay_BTN.png')
+REPLAY_BTN_ACTIVE = pygame.image.load('Assets/game_over/Replay_BTN_A.png')
+MAIN_MENU_BTN = pygame.image.load('Assets/game_over/Menu_BTN.png')
+MAIN_MENU_BTN_A = pygame.image.load('Assets/game_over/Menu_BTN_A.png')
+# Active game variables
 BACKGROUND = pygame.image.load('Assets/misc/background.jpg')
 BAR = pygame.image.load('Assets/misc/bar.png')
 BAR = pygame.transform.scale(BAR, (WIDTH, 50))
-LASER = pygame.image.load('Assets/misc/laser.png')
 HEALTH = pygame.transform.scale(pygame.image.load('Assets/misc/health_title.png'
                                                   ), (103, 19))
 HEART = pygame.transform.scale(pygame.image.load('Assets/misc/heart.png'), (32,
@@ -32,6 +43,7 @@ PLATFORM = pygame.transform.scale(pygame.image.load('Assets/misc/platform.png'),
                                   (188, 144))
 PLATFORM_RECT = PLATFORM.get_rect()
 PLATFORM_RECT.topleft = (WIDTH // 2 - 94, 30)
+LASER = pygame.image.load('Assets/misc/laser.png')
 LASER_SOUND = pygame.mixer.Sound('Assets/sounds/laser_sound.wav')
 LASER_SOUND.set_volume(0.2)
 RELOAD_SOUND = pygame.mixer.Sound('Assets/sounds/reload.wav')
@@ -40,26 +52,25 @@ EXPLOSION_SOUND = pygame.mixer.Sound('Assets/sounds/explosion_sound.wav')
 TIMER_SOUND = pygame.mixer.Sound('Assets/sounds/timer.wav')
 WAVE_START = pygame.mixer.Sound('Assets/sounds/wave_start.wav')
 WAVE_FINISH = pygame.mixer.Sound('Assets/sounds/wave_complete.wav')
-CHARACTER_STILL = pygame.image.load('Assets/character/char_still.png')
-CHARACTER_RIGHT = pygame.image.load('Assets/character/char_right.png')
-CHARACTER_LEFT = pygame.image.load('Assets/character/char_left.png')
 CHAR_HIT = pygame.mixer.Sound('Assets/sounds/player_hit.wav')
 CHAR_HIT.set_volume(0.5)
 CHAR_DEATH = pygame.mixer.Sound('Assets/sounds/player_dead.wav')
 NO_AMMO = pygame.mixer.Sound('Assets/sounds/no_ammo.wav')
+CHARACTER_STILL = pygame.image.load('Assets/character/char_still.png')
+CHARACTER_RIGHT = pygame.image.load('Assets/character/char_right.png')
+CHARACTER_LEFT = pygame.image.load('Assets/character/char_left.png')
 CHAR_DIM = 128
 SPEED = 5
 BULL_VEL = 6
 GUN_AMMO = 32
 AMMO_COST = 30
+# Colours
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 YELLOW = (255, 255, 0)
 RED = (255, 0, 0)
 GREEN = (0, 128, 0)
-pygame.display.set_caption("Moon Mayhem")
-pygame.display.set_icon(ICON)
-FPS = 60
+# Fonts
 FONT = pygame.font.Font('Assets/misc/font.ttf', 34)
 FONT_SMALL = pygame.font.Font('Assets/misc/font.ttf', 24)
 FONT_BOLD = pygame.font.Font('Assets/misc/bold_font.ttf', 34)
@@ -517,10 +528,14 @@ class Player:
                 self._death_sprites)
 
         x, y = self.rect.topleft
+        x -= 75
+        y -= 75
         WINDOW.blit(self._death_sprites[self._curr_death_sprite], (x, y))
 
         if self._curr_death_sprite == 21:
             self.full_dead = True
+            pygame.mixer.stop()
+            GAME_OVER_MUSIC.play(-1)
 
 
 class Enemy:
@@ -1355,7 +1370,85 @@ class Wave:
         WINDOW.blit(remaining_text, (375, 670))
 
 
-def draw_window(wave: Wave, char: Player, rotation: float):
+class GameOver:
+    """ The game over screen for this game.
+    
+        This class handles the game over screen when the character dies.
+    
+    === Public Attributes ===
+    retry_btn:
+         The pygame rectangle representing the retry button
+    menu_btn:
+         The pygame rectangle representing the menu button
+    click:
+         A boolean which is True when the screen is clicked and False 
+         otherwise
+    retry_active:
+         A boolean which indicates if the cursor is hovering over the
+         retry button (True) or not (False)
+    menu_active:
+         A boolean which indicates if the cursor is hovering over the
+         menu button (True) or not (False)
+    """
+
+
+    def __init__(self) -> None:
+        self.retry_btn = REPLAY_BTN.get_rect()
+        self.retry_btn.center = (WIDTH // 2 - 200, HEIGHT // 2 + 50)
+        self.menu_btn = MAIN_MENU_BTN.get_rect()
+        self.menu_btn.center = (WIDTH // 2 + 200, HEIGHT // 2 + 50)
+        self.click = False
+        self.retry_active = False
+        self.menu_active = False
+        self.play_highlight_sound = False
+        self.retry = False
+        self.return_to_menu = False
+
+    def draw_menu(self) -> None:
+        WINDOW.blit(GAME_OVER_BG, (0,0))
+        WINDOW.blit(GAME_OVER_TEXT, (WIDTH // 2 - 347, 100))
+        if self.retry_active:
+            WINDOW.blit(REPLAY_BTN_ACTIVE, self.retry_btn.topleft)
+            retry_text = FONT.render('RETRY', False, YELLOW)
+            x, y = self.retry_btn.bottomleft
+            x += 55
+            y += 5
+            WINDOW.blit(retry_text, (x, y))
+        else:
+            WINDOW.blit(REPLAY_BTN, self.retry_btn.topleft)
+        if self.menu_active:
+            WINDOW.blit(MAIN_MENU_BTN_A, self.menu_btn.topleft)
+            retry_text = FONT.render('MAIN MENU', False, YELLOW)
+            x, y = self.menu_btn.bottomleft
+            x += 15
+            y += 5
+            WINDOW.blit(retry_text, (x, y))
+        else:
+            WINDOW.blit(MAIN_MENU_BTN, self.menu_btn.topleft)
+
+    def handle_buttons(self, mx: float, my: float) -> None:
+        if self.retry_btn.collidepoint(mx, my):
+            self.retry_active = True
+            if not self.play_highlight_sound:
+                HIGHLIGHT.play()
+            self.play_highlight_sound = True
+            if self.click:
+                GAME_OVER_MUSIC.stop()
+                self.retry = True
+        elif self.menu_btn.collidepoint(mx, my):
+            self.menu_active = True
+            if not self.play_highlight_sound:
+                HIGHLIGHT.play()
+            self.play_highlight_sound = True
+            if self.click:
+                self.return_to_menu = True
+        else:
+            self.retry_active = False
+            self.menu_active = False
+            self.play_highlight_sound = False
+
+
+def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu: GameOver):
     """ This function is responsible for drawing every element of this game
     onto the screen.
     """
@@ -1366,9 +1459,10 @@ def draw_window(wave: Wave, char: Player, rotation: float):
     char.draw_bullets(wave.enemies)
     if not char.dead:
         WINDOW.blit(curr_char, char.rect.topleft)
+        wave.enemy_animations()
     elif not char.full_dead:
         char.death_animation()
-    wave.enemy_animations()
+        wave.enemy_animations()
     WINDOW.blit(BAR, (0, HEIGHT - 50))
     WINDOW.blit(HEALTH, (WIDTH - 355, HEIGHT - 35))
     char.check_buy()
@@ -1383,10 +1477,12 @@ def draw_window(wave: Wave, char: Player, rotation: float):
         wave.show_remaining()
     elif wave.wave_complete:
         wave.wave_complete_anim()
+    if char.full_dead:
+        game_over_menu.draw_menu()
     pygame.display.update()
 
 
-def main():
+def main() -> bool:
     """ This function contains the main game loop for this game and handles
     creation of the player and the wave class. It also handles inputs to the
     game, as well as the movement of the character, their health, and updating
@@ -1399,6 +1495,7 @@ def main():
     pygame.mixer.music.load('Assets/sounds/background_music.wav')
     pygame.mixer.music.set_volume(0.6)
     pygame.mixer.music.play(-1)
+    game_over_menu = GameOver()
     while run:
         clock.tick(FPS)
         mx, my = pygame.mouse.get_pos()
@@ -1406,10 +1503,12 @@ def main():
         rotation = (180 / math.pi) * -math.atan2(dif_y, dif_x) - 90
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                run = False
+                pygame.quit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1 and not char.dead:
                     char.shoot_bullet(mx, my)
+                elif event.button == 1:
+                    game_over_menu.click = True
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE and not wave.begin:
                     wave.begin_waves()
@@ -1418,7 +1517,15 @@ def main():
                 if event.key == pygame.K_b and char.at_buy_platform and \
                         char.has_funds and not char.dead:
                     char.buy_ammo()
-
+            if char.full_dead:
+                game_over_menu.handle_buttons(float(mx), float(my))
+                if game_over_menu.retry:
+                    WAVE_FINISH.play()
+                    return True
+                elif game_over_menu.return_to_menu:
+                    pygame.mixer.stop()
+                    return False
+            game_over_menu.click = False
         key_pressed = pygame.key.get_pressed()
         if not char.dead:
             char.move(key_pressed)
@@ -1427,7 +1534,8 @@ def main():
         if wave.wave_commenced:
             wave.handle_enemies(char)
 
-        draw_window(wave, char, rotation)
+        draw_window(wave, char, rotation, game_over_menu)
+    return False
 
 
 def draw_menu(bg_rect, bg_rect2, start_btn, exit_btn, start_active, exit_active):
@@ -1489,8 +1597,11 @@ def main_menu():
             playing = True
             if click:
                 MENU_MUSIC.stop()
-                main()
-                run = False
+                GAME_START.play()
+                retry = True
+                while retry:
+                    retry = main()
+                MENU_MUSIC.play(-1)
         elif exit_btn.collidepoint(mx, my):
             exit_active = True
             if not playing:
