@@ -1373,7 +1373,9 @@ class Wave:
 class GameOver:
     """ The game over screen for this game.
     
-        This class handles the game over screen when the character dies.
+    This class handles the game over screen when the character dies.
+    It handles the drawing of the menu and handling of the buttons
+    and their function when they are pressed.
     
     === Public Attributes ===
     retry_btn:
@@ -1389,10 +1391,30 @@ class GameOver:
     menu_active:
          A boolean which indicates if the cursor is hovering over the
          menu button (True) or not (False)
+    play_highlight_sound:
+         A boolean which tracks if the highlight sound has been played
+         once
+    retry:
+         A boolean which indicates if the player has chosen to retry the
+         game (True) or hasn't chosen this option yet or at all (False)
+    return_to_menu:
+         A boolean which indicates if the player has chosen to return
+         to the main menu (True) or hasn't made this decision yet or
+         at all (False)
     """
-
+    retry_btn: pygame.rect
+    menu_btn: pygame.rect
+    click: bool
+    retry_active: bool
+    menu_active: bool
+    play_highlight_sound: bool
+    retry: bool
+    return_to_menu: bool
 
     def __init__(self) -> None:
+        """ Initialize the pygame rectangles for the buttons as well as
+        the boolean attributes for this menu.
+        """
         self.retry_btn = REPLAY_BTN.get_rect()
         self.retry_btn.center = (WIDTH // 2 - 200, HEIGHT // 2 + 50)
         self.menu_btn = MAIN_MENU_BTN.get_rect()
@@ -1405,6 +1427,10 @@ class GameOver:
         self.return_to_menu = False
 
     def draw_menu(self) -> None:
+        """ Draw the game over text as well as the buttons on the screen
+        and change them to a different colour if they're being hovered
+        over.
+        """
         WINDOW.blit(GAME_OVER_BG, (0,0))
         WINDOW.blit(GAME_OVER_TEXT, (WIDTH // 2 - 347, 100))
         if self.retry_active:
@@ -1427,6 +1453,11 @@ class GameOver:
             WINDOW.blit(MAIN_MENU_BTN, self.menu_btn.topleft)
 
     def handle_buttons(self, mx: float, my: float) -> None:
+        """ Handles button presses by checking where the screen was clicked
+        according to <mx> and <my> mouse position coordinates,
+        and if a button was clicked, handles the action this button performs
+        such as retrying the game or returning to the main menu.
+        """
         if self.retry_btn.collidepoint(mx, my):
             self.retry_active = True
             if not self.play_highlight_sound:
@@ -1448,6 +1479,20 @@ class GameOver:
             self.play_highlight_sound = False
 
 
+def _draw_window_helper(wave: Wave, char: Player) -> None:
+    """ A helper function for the draw_window() function which
+    animates the enemies in the <wave> as well as the character
+    <char> ammo, money, and hearts.
+    """
+    wave.enemy_animations()
+    WINDOW.blit(BAR, (0, HEIGHT - 50))
+    WINDOW.blit(HEALTH, (WIDTH - 355, HEIGHT - 35))
+    char.check_buy()
+    char.draw_hearts()
+    char.display_money()
+    char.draw_ammo()
+
+
 def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu: GameOver):
     """ This function is responsible for drawing every element of this game
     onto the screen.
@@ -1459,26 +1504,21 @@ def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu: GameO
     char.draw_bullets(wave.enemies)
     if not char.dead:
         WINDOW.blit(curr_char, char.rect.topleft)
-        wave.enemy_animations()
+        _draw_window_helper(wave, char)
     elif not char.full_dead:
         char.death_animation()
-        wave.enemy_animations()
-    WINDOW.blit(BAR, (0, HEIGHT - 50))
-    WINDOW.blit(HEALTH, (WIDTH - 355, HEIGHT - 35))
-    char.check_buy()
-    char.draw_hearts()
-    char.display_money()
-    char.draw_ammo()
+        _draw_window_helper(wave, char)
+    else:
+        game_over_menu.draw_menu()
+
     if not wave.begin:
         wave.request_wave_start()
     elif wave.start_wave_anim:
         wave.wave_start_animation()
-    elif wave.wave_commenced:
+    elif wave.wave_commenced and not char.full_dead:
         wave.show_remaining()
     elif wave.wave_complete:
         wave.wave_complete_anim()
-    if char.full_dead:
-        game_over_menu.draw_menu()
     pygame.display.update()
 
 
@@ -1538,30 +1578,141 @@ def main() -> bool:
     return False
 
 
-def draw_menu(bg_rect, bg_rect2, start_btn, exit_btn, start_active, exit_active):
-    WINDOW.blit(MENU_BG, bg_rect.topleft)
-    WINDOW.blit(MENU_BG, bg_rect2.topleft)
-    if start_active:
-        WINDOW.blit(START_BTN_ACTIVE, start_btn.topleft)
-    else:
-        WINDOW.blit(START_BTN, start_btn.topleft)
-    if exit_active:
-        WINDOW.blit(EXIT_BTN_ACTIVE, exit_btn.topleft)
-    else:
-        WINDOW.blit(EXIT_BTN, exit_btn.topleft)
-    WINDOW.blit(TITLE, (WIDTH // 2 - 282, 50))
-    pygame.display.update()
+class MainMenu:
+    """ The Main Menu class for this game.
 
-
-def move_bg(bg_rect, bg_rect2):
-    """ Move the background.
+    This class handles the creation of the menu, the movement of the
+    background images, the drawing of the menu elements, and handling
+    of button presses and the functions they should perform.
+    
+    === Public Attributes ===
+    self.bg_rect:
+         The pygame rectangle representing the menu background, meant
+         to move upwards
+    self.bg_rect2:
+         A pygame rectangle representing the second menu background,
+         meant to move up following <self.bg_rect>
+    self.start_btn:
+         The pygame rectangle representing the area of the start button
+    self.exit_btn:
+         The pygame rectangle representing the area of the exit button
+    self.start_active:
+         A boolean which indicates if the cursor is on the start button
+         and if it should be highlighted
+    self.exit_active:
+         A boolean which indicates if the cursor is on the exit button
+         and if it should be highlighted
+    self.playing:
+         A boolean which indicates if the button select sound is already
+         playing
+    self.click:
+         A boolean which represents if the screen has been clicked
     """
-    bg_rect.y -= 1
-    bg_rect2.y -= 1
-    if bg_rect.bottomleft == (0, -1):
-        bg_rect.topleft = (0, 2277)
-    elif bg_rect2.bottomleft == (0, -1):
-        bg_rect2.topleft = (0, 2277)
+    bg_rect: pygame.rect
+    bg_rect2: pygame.rect
+    start_btn: pygame.rect
+    exit_btn: pygame.rect
+    start_active: bool
+    exit_active: bool
+    playing: bool
+    click: bool
+
+    def __init__(self) -> None:
+        """ Initialize the pygame rectangles for the background and buttons,
+        as well as the boolean attributes for highlighting the buttons,
+        playing the highlight sound, and clicking the screen.
+        """
+        self.bg_rect = MENU_BG.get_rect()
+        self.bg_rect.topleft = (0, 0)
+        self.bg_rect2 = MENU_BG.get_rect()
+        self.bg_rect2.topleft = (0, 2277)
+        self.start_btn = START_BTN.get_rect()
+        self.start_btn.center = (WIDTH // 2, HEIGHT // 2 + 50)
+        self.exit_btn = EXIT_BTN.get_rect()
+        self.exit_btn.center = (WIDTH // 2, HEIGHT // 2 + 200)
+        self.start_active = False
+        self.exit_active = False
+        self.playing = False
+        self.click = False
+
+    def move_bg(self):
+        """ Moves the pygame rectangles representing the two
+        background images upwards, following each other. When one
+        background image leaves the screen, it is moved down below
+        the other one to continue moving upwards onto the screen.
+        """
+        self.bg_rect.y -= 1
+        self.bg_rect2.y -= 1
+        if self.bg_rect.bottomleft == (0, -1):
+            self.bg_rect.topleft = (0, 2277)
+        elif self.bg_rect2.bottomleft == (0, -1):
+            self.bg_rect2.topleft = (0, 2277)
+
+    def draw_menu(self) -> None:
+        """ Draw the elements of the menu such as the background images,
+        The start and exit buttons, and the title. Also handles deciding
+        to show the highlighted forms of the start and exit buttons if
+        the cursor is on top of them.
+        """
+        WINDOW.blit(MENU_BG, self.bg_rect.topleft)
+        WINDOW.blit(MENU_BG, self.bg_rect2.topleft)
+        if self.start_active:
+            WINDOW.blit(START_BTN_ACTIVE, self.start_btn.topleft)
+        else:
+            WINDOW.blit(START_BTN, self.start_btn.topleft)
+        if self.exit_active:
+            WINDOW.blit(EXIT_BTN_ACTIVE, self.exit_btn.topleft)
+        else:
+            WINDOW.blit(EXIT_BTN, self.exit_btn.topleft)
+        WINDOW.blit(TITLE, (WIDTH // 2 - 282, 50))
+        pygame.display.update()
+
+    def _handle_start_btn(self) -> None:
+        """ Handles highlighting the start button if the cursor is hovering
+        over it, and starts the main game when this button is pressed.
+        Continues to start the game as long as the player wants to keep
+        retrying.
+        """
+        self.start_active = True
+        if not self.playing:
+            HIGHLIGHT.play()
+        self.playing = True
+        if self.click:
+            MENU_MUSIC.stop()
+            GAME_START.play()
+            retry = True
+            while retry:
+                retry = main()
+            MENU_MUSIC.play(-1)
+
+    def _handle_exit_btn(self) -> bool:
+        """ Handles playing the highlight sound when the mouse is above this
+        button, as well as exiting the game if it is pressed by returning
+        False.
+        """
+        self.exit_active = True
+        if not self.playing:
+            HIGHLIGHT.play()
+        self.playing = True
+        if self.click:
+            return False
+        return True
+
+    def handle_buttons(self, mx: float, my: float) -> bool:
+        """ Handles button presses by checking if the screen was clicked
+        when the mouse was over a button, and then performing the
+        appropriate action for that button.
+        """
+        if self.start_btn.collidepoint(mx, my):
+            self._handle_start_btn()
+        elif self.exit_btn.collidepoint(mx, my):
+            return self._handle_exit_btn()
+        else:
+            self.start_active = False
+            self.exit_active = False
+            self.playing = False
+        self.click = False
+        return True
 
 
 def main_menu():
@@ -1569,57 +1720,23 @@ def main_menu():
     """
     run = True
     clock = pygame.time.Clock()
-    bg_rect = MENU_BG.get_rect()
-    bg_rect.topleft = (0, 0)
-    bg_rect2 = MENU_BG.get_rect()
-    bg_rect2.topleft = (0, 2277)
-    start_btn = START_BTN.get_rect()
-    start_btn.center = (WIDTH // 2, HEIGHT // 2 + 50)
-    exit_btn = EXIT_BTN.get_rect()
-    exit_btn.center = (WIDTH // 2, HEIGHT // 2 + 200)
-    start_active = False
-    exit_active = False
-    playing = False
-    click = False
+    menu = MainMenu()
     MENU_MUSIC.play(-1)
 
     while run:
         clock.tick(FPS)
+        menu.move_bg()
+        menu.draw_menu()
         mx, my = pygame.mouse.get_pos()
         mx = float(mx)
         my = float(my)
-        move_bg(bg_rect, bg_rect2)
-        draw_menu(bg_rect, bg_rect2, start_btn, exit_btn, start_active, exit_active)
-        if start_btn.collidepoint(mx, my):
-            start_active = True
-            if not playing:
-                HIGHLIGHT.play()
-            playing = True
-            if click:
-                MENU_MUSIC.stop()
-                GAME_START.play()
-                retry = True
-                while retry:
-                    retry = main()
-                MENU_MUSIC.play(-1)
-        elif exit_btn.collidepoint(mx, my):
-            exit_active = True
-            if not playing:
-                HIGHLIGHT.play()
-            playing = True
-            if click:
-                run = False
-        else:
-            start_active = False
-            exit_active = False
-            playing = False
-        click = False
+        run = menu.handle_buttons(mx, my)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    click = True
+                    menu.click = True
     pygame.quit()
 
 if __name__ == "__main__":
