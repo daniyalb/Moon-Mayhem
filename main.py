@@ -43,6 +43,8 @@ PLATFORM = pygame.transform.scale(pygame.image.load('Assets/misc/platform.png'),
                                   (188, 144))
 PLATFORM_RECT = PLATFORM.get_rect()
 PLATFORM_RECT.topleft = (WIDTH // 2 - 94, 30)
+RED_ARROW = pygame.image.load('Assets/misc/arrow.png')
+RED_ARROW = pygame.transform.scale(RED_ARROW, (64, 64))
 LASER = pygame.image.load('Assets/misc/laser.png')
 LASER_SOUND = pygame.mixer.Sound('Assets/sounds/laser_sound.wav')
 LASER_SOUND.set_volume(0.2)
@@ -252,6 +254,9 @@ class Player:
         self._last_update_health = 0
         self._last_update_dead = 0
         self._money_gain = []
+        self._buy_station_arrow = RED_ARROW.get_rect()
+        self._buy_station_arrow.topleft = (WIDTH // 2 - 32, 200)
+        self._arrow_movement = -1
         self.bullets = []
         self.health = 5
         self.money = 0
@@ -380,6 +385,14 @@ class Player:
             WINDOW.blit(LASER, (bullet.rect.x, bullet.rect.y))
             self._handle_bullets(bullet, enemies)
 
+
+    def _move_arrow(self):
+        self._buy_station_arrow.y += self._arrow_movement
+        if self._buy_station_arrow.y == 150:
+            self._arrow_movement = 1
+        elif self._buy_station_arrow.y == 200:
+            self._arrow_movement = -1
+
     def draw_ammo(self) -> None:
         """ Handles the drawing of the amount of current ammo and total ammo on
         the bottom right of the screen. Also draws messages to reload or buy
@@ -394,11 +407,19 @@ class Player:
 
         if self.need_reload:
             reload_text = FONT_SMALL.render('PRESS "R" TO RELOAD!', False, RED)
+            reload_text_w = FONT_SMALL.render('PRESS "R" TO RELOAD!', False, WHITE)
+            WINDOW.blit(reload_text_w, (WIDTH - 236, HEIGHT - 154))
             WINDOW.blit(reload_text, (WIDTH - 235, HEIGHT - 155))
         elif self.out_of_ammo:
-            reload_text = FONT_SMALL.render('OUT OF AMMO! BUY MORE!', False,
+            out_text = FONT_SMALL.render('OUT OF AMMO! BUY MORE!', False,
                                             RED)
-            WINDOW.blit(reload_text, (WIDTH - 285, HEIGHT - 155))
+            out_text_w = FONT_SMALL.render('OUT OF AMMO! BUY MORE!', False,
+                                            WHITE)
+            WINDOW.blit(out_text_w, (WIDTH - 286, HEIGHT - 154))
+            WINDOW.blit(out_text, (WIDTH - 285, HEIGHT - 155))
+            if not self.at_buy_platform:
+                self._move_arrow()
+                WINDOW.blit(RED_ARROW, self._buy_station_arrow.topleft)
 
     def reload(self) -> None:
         """ Reload this player's ammo to the appropriate amount, and make the
