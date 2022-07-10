@@ -45,6 +45,10 @@ PLATFORM_RECT = PLATFORM.get_rect()
 PLATFORM_RECT.topleft = (WIDTH // 2 - 94, 30)
 RED_ARROW = pygame.image.load('Assets/misc/arrow.png')
 RED_ARROW = pygame.transform.scale(RED_ARROW, (64, 64))
+WASD = pygame.image.load('Assets/misc/keys.png')
+WASD = pygame.transform.scale(WASD, (181, 97))
+CURSOR = pygame.image.load('Assets/misc/cursor.png')
+CURSOR = pygame.transform.scale(CURSOR, (53, 53))
 LASER = pygame.image.load('Assets/misc/laser.png')
 LASER_SOUND = pygame.mixer.Sound('Assets/sounds/laser_sound.wav')
 LASER_SOUND.set_volume(0.2)
@@ -1174,7 +1178,6 @@ class Mushroom(Enemy):
         has finished in order to indicate to the Wave class to remove this
         enemy from its self.enemies list.
         """
-        TIMER_SOUND.stop()
         if self.exploded:
             now = pygame.time.get_ticks()
             window.blit(self._death_sprites[self._curr_death_sprite],
@@ -1437,9 +1440,9 @@ class GameOver:
         the boolean attributes for this menu.
         """
         self.retry_btn = REPLAY_BTN.get_rect()
-        self.retry_btn.center = (WIDTH // 2 - 200, HEIGHT // 2 + 50)
+        self.retry_btn.center = (WIDTH // 2 - 150, HEIGHT // 2 + 50)
         self.menu_btn = MAIN_MENU_BTN.get_rect()
-        self.menu_btn.center = (WIDTH // 2 + 200, HEIGHT // 2 + 50)
+        self.menu_btn.center = (WIDTH // 2 + 150, HEIGHT // 2 + 50)
         self.click = False
         self.retry_active = False
         self.menu_active = False
@@ -1514,6 +1517,21 @@ def _draw_window_helper(wave: Wave, char: Player) -> None:
     char.draw_ammo()
 
 
+def control_instructions():
+    """ A function which displays the controls of the game to the player
+    """
+    control_text1 = FONT.render('Use', False, WHITE)
+    control_text2 = FONT.render('to move', False, WHITE)
+    control_text3 = FONT.render('Point with the mouse', False, WHITE)
+    control_text4 = FONT.render('and click to shoot', False, WHITE)
+    WINDOW.blit(control_text1, (40, 70))
+    WINDOW.blit(WASD, (100, 20))
+    WINDOW.blit(control_text2, (290, 70))
+    WINDOW.blit(control_text3, (40, 130))
+    WINDOW.blit(CURSOR, (310, 180))
+    WINDOW.blit(control_text4, (40, 170))
+
+
 def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu: GameOver):
     """ This function is responsible for drawing every element of this game
     onto the screen.
@@ -1534,6 +1552,7 @@ def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu: GameO
 
     if not wave.begin:
         wave.request_wave_start()
+        control_instructions()
     elif wave.start_wave_anim:
         wave.wave_start_animation()
     elif wave.wave_commenced and not char.full_dead:
@@ -1541,6 +1560,28 @@ def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu: GameO
     elif wave.wave_complete:
         wave.wave_complete_anim()
     pygame.display.update()
+
+
+def _main_event_helper(event, char: Player, wave: Wave, game_over_menu: GameOver, mx: int, my: int) -> None:
+    """ A helper function for the main() function which handles checking
+    which event is currently occuring and performing the appropriate
+    action.
+    """
+    if event.type == pygame.QUIT:
+        pygame.quit()
+    if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.button == 1 and not char.dead:
+            char.shoot_bullet(mx, my)
+        elif event.button == 1:
+            game_over_menu.click = True
+    if event.type == pygame.KEYDOWN:
+        if event.key == pygame.K_SPACE and not wave.begin:
+            wave.begin_waves()
+        if event.key == pygame.K_r and char.need_reload and not char.dead:
+            char.reload()
+        if event.key == pygame.K_b and char.at_buy_platform and \
+                char.has_funds and not char.dead:
+            char.buy_ammo()
 
 
 def main() -> bool:
@@ -1563,21 +1604,7 @@ def main() -> bool:
         dif_x, dif_y = mx - char.rect.centerx, my - char.rect.centery
         rotation = (180 / math.pi) * -math.atan2(dif_y, dif_x) - 90
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1 and not char.dead:
-                    char.shoot_bullet(mx, my)
-                elif event.button == 1:
-                    game_over_menu.click = True
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE and not wave.begin:
-                    wave.begin_waves()
-                if event.key == pygame.K_r and char.need_reload and not char.dead:
-                    char.reload()
-                if event.key == pygame.K_b and char.at_buy_platform and \
-                        char.has_funds and not char.dead:
-                    char.buy_ammo()
+            _main_event_helper(event, char, wave, game_over_menu, mx, my)
             if char.full_dead:
                 game_over_menu.handle_buttons(float(mx), float(my))
                 if game_over_menu.retry:
@@ -1737,7 +1764,9 @@ class MainMenu:
 
 
 def main_menu():
-    """ The main menu for this game.
+    """ The main menu for this game. This function contains the main
+    loop for the menu and calls on methods in the MainMenu class to
+    control the main menu and allow it to perform it's functions.
     """
     run = True
     clock = pygame.time.Clock()
