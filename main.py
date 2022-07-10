@@ -678,7 +678,7 @@ class Enemy:
         else:
             self.play_hit_animation = True
 
-    def draw_health(self, window: pygame.Surface) -> None:
+    def draw_health(self) -> None:
         """ Draw a rectangle underneath the enemy which displays the amount of
         health it has remaining. This method moves this bar to keep it under the
         enemy, and updates it by changing how it looks to show what level of
@@ -694,15 +694,15 @@ class Enemy:
         if self.health == 2:
             split = int((x2 - x1) * 0.66)
             split += x1
-            pygame.draw.line(window, GREEN, (x1, y1), (split, y2), 4)
-            pygame.draw.line(window, RED, (split, y1), (x2, y2), 4)
+            pygame.draw.line(WINDOW, GREEN, (x1, y1), (split, y2), 4)
+            pygame.draw.line(WINDOW, RED, (split, y1), (x2, y2), 4)
         elif self.health == 1:
             split = int((x2 - x1) * 0.33)
             split += x1
-            pygame.draw.line(window, GREEN, (x1, y1), (split, y2), 4)
-            pygame.draw.line(window, RED, (split, y1), (x2, y2), 4)
+            pygame.draw.line(WINDOW, GREEN, (x1, y1), (split, y2), 4)
+            pygame.draw.line(WINDOW, RED, (split, y1), (x2, y2), 4)
         else:
-            pygame.draw.line(window, GREEN, (x1, y1), (x2, y2), 4)
+            pygame.draw.line(WINDOW, GREEN, (x1, y1), (x2, y2), 4)
 
     def animate(self, x: int) -> None:
         """ Animate the enemy by cycling through its animation as it moves.
@@ -730,7 +730,7 @@ class Enemy:
                                                          False)
                 self._facing = 'right'
 
-    def hit_animation(self, window: pygame.Surface) -> None:
+    def hit_animation(self) -> None:
         """ When this enemy is hit by a bullet, this method plays an animation
         of a blood splatter at the location where the enemy was hit.
         """
@@ -744,12 +744,12 @@ class Enemy:
         x, y = self.rect.topleft
         x -= 80
         y -= 80
-        window.blit(self._hit_sprites[self._curr_hit_sprite], (x, y))
+        WINDOW.blit(self._hit_sprites[self._curr_hit_sprite], (x, y))
 
         if self._curr_hit_sprite == 27:
             self.play_hit_animation = False
 
-    def death_animation(self, window: pygame.Surface) -> None:
+    def death_animation(self) -> None:
         """ Once this enemy is killed, this method plays an animation of a blood
          splatter where the enemy died. It then sets <self.remove> to True to
          indicate to the Wave class to remove this enemy from its self.enemies
@@ -765,7 +765,7 @@ class Enemy:
         x, y = self.rect.topleft
         x -= 60
         y -= 60
-        window.blit(self._death_sprites[self._curr_death_sprite], (x, y))
+        WINDOW.blit(self._death_sprites[self._curr_death_sprite], (x, y))
 
         if self._curr_death_sprite == 29:
             self.remove = True
@@ -1067,6 +1067,8 @@ class Mushroom(Enemy):
     # _close:
     #    A boolean which tracks if this enemy is within 100 pixels of the
     #    player
+    # _timer_sound:
+    #    The sound that plays when this enemy is priming to explode
 
     rect: pygame.Rect
     curr_sprite: pygame.Surface
@@ -1091,6 +1093,7 @@ class Mushroom(Enemy):
     _death_sprites: list[pygame.Surface]
     _enemy_sprites: list[pygame.Surface]
     _hit_sprites: list[pygame.Surface]
+    _timer_sound: pygame.mixer.Sound
 
     def __init__(self) -> None:
         """ Initialize this Mushroom enemy by calling on the super class as well
@@ -1110,6 +1113,7 @@ class Mushroom(Enemy):
         self._last_update_explode = 0
         self._sprite_changed = False
         self._close = False
+        self._timer_sound = TIMER_SOUND
         self.spawn()
 
     def move(self, x: int, y: int) -> None:
@@ -1152,7 +1156,7 @@ class Mushroom(Enemy):
         if not self._sprite_changed:
             self._enemy_sprites = MUSHROOM_EXPLODE_SPRITES
             self._last_update_explode = pygame.time.get_ticks()
-            TIMER_SOUND.play()
+            self._timer_sound.play()
             self._sprite_changed = True
 
     def _explode(self) -> None:
@@ -1172,7 +1176,7 @@ class Mushroom(Enemy):
             self.dead = True
             self.exploded = True
 
-    def death_animation(self, window: pygame.Surface) -> None:
+    def death_animation(self) -> None:
         """ Swap through sprites which represent this enemy's death, an
         explosion, and set <self.remove> to True once their death animation
         has finished in order to indicate to the Wave class to remove this
@@ -1180,7 +1184,7 @@ class Mushroom(Enemy):
         """
         if self.exploded:
             now = pygame.time.get_ticks()
-            window.blit(self._death_sprites[self._curr_death_sprite],
+            WINDOW.blit(self._death_sprites[self._curr_death_sprite],
                         self.rect.topleft)
             if now - self._last_update_dead > 60:
                 self._last_update_dead = now
@@ -1189,7 +1193,8 @@ class Mushroom(Enemy):
             if self._curr_death_sprite == 11:
                 self.remove = True
         else:
-            Enemy.death_animation(self, window)
+            self._timer_sound.stop()
+            Enemy.death_animation(self)
 
 
 class Wave:
@@ -1364,11 +1369,11 @@ class Wave:
         for enemy in self.enemies:
             if not enemy.dead:
                 WINDOW.blit(enemy.curr_sprite, (enemy.rect.x, enemy.rect.y))
-                enemy.draw_health(WINDOW)
+                enemy.draw_health()
                 if enemy.play_hit_animation:
-                    enemy.hit_animation(WINDOW)
+                    enemy.hit_animation()
             else:
-                enemy.death_animation(WINDOW)
+                enemy.death_animation()
 
     def wave_complete_anim(self) -> None:
         """ This method displays text on the screen indicating that a wave was
@@ -1418,6 +1423,14 @@ class GameOver:
     play_highlight_sound:
          A boolean which tracks if the highlight sound has been played
          once
+    updated_score:
+         A boolean which tracks if the high score has been updated yet
+    high_score:
+         An integer representing the highest score achieved in the game
+         out of all tries, including in previous runs of this program.
+         This initially starts as 0 but is later updated to the highest
+         score achieved according to scores.txt in the Assets/misc
+         folder
     retry:
          A boolean which indicates if the player has chosen to retry the
          game (True) or hasn't chosen this option yet or at all (False)
@@ -1434,6 +1447,8 @@ class GameOver:
     play_highlight_sound: bool
     retry: bool
     return_to_menu: bool
+    updated_score: bool
+    high_score: int
 
     def __init__(self) -> None:
         """ Initialize the pygame rectangles for the buttons as well as
@@ -1449,6 +1464,8 @@ class GameOver:
         self.play_highlight_sound = False
         self.retry = False
         self.return_to_menu = False
+        self.updated_score = False
+        self.high_score = 0
 
     def draw_menu(self) -> None:
         """ Draw the game over text as well as the buttons on the screen
@@ -1475,6 +1492,9 @@ class GameOver:
             WINDOW.blit(retry_text, (x, y))
         else:
             WINDOW.blit(MAIN_MENU_BTN, self.menu_btn.topleft)
+        high_score_text = FONT.render('CURRENT HIGHSCORE: ' + str(self.high_score), 
+        False, WHITE)
+        WINDOW.blit(high_score_text, (450, 600))
 
     def handle_buttons(self, mx: float, my: float) -> None:
         """ Handles button presses by checking where the screen was clicked
@@ -1550,9 +1570,11 @@ def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu: GameO
     else:
         game_over_menu.draw_menu()
 
+    if wave.wave == 0:
+        control_instructions()
+
     if not wave.begin:
         wave.request_wave_start()
-        control_instructions()
     elif wave.start_wave_anim:
         wave.wave_start_animation()
     elif wave.wave_commenced and not char.full_dead:
@@ -1560,6 +1582,26 @@ def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu: GameO
     elif wave.wave_complete:
         wave.wave_complete_anim()
     pygame.display.update()
+
+
+def update_highscore(game_over_menu: GameOver, wave: Wave):
+    """ This function adds the current wave achieved to a text file
+    containing all of the waves achieved in each game this player has
+    played. These scores are then read through and the highest one
+    is set as the highest score to be displayed in the game over
+    menu.
+    """
+    if not game_over_menu.updated_score:
+        with open('Assets/misc/scores.txt', 'a') as scores:
+            scores.write(str(wave.wave) + '\n')
+        with open('Assets/misc/scores.txt', 'r') as scores:
+            all_scores = scores.readlines()
+            highest = int(all_scores[0])
+            for curr_score in all_scores:
+                if int(curr_score) > highest:
+                    highest = int(curr_score)
+            game_over_menu.high_score = highest
+        game_over_menu.updated_score = True
 
 
 def _main_event_helper(event, char: Player, wave: Wave, game_over_menu: GameOver, mx: int, my: int) -> None:
@@ -1605,19 +1647,20 @@ def main() -> bool:
         rotation = (180 / math.pi) * -math.atan2(dif_y, dif_x) - 90
         for event in pygame.event.get():
             _main_event_helper(event, char, wave, game_over_menu, mx, my)
-            if char.full_dead:
-                game_over_menu.handle_buttons(float(mx), float(my))
-                if game_over_menu.retry:
-                    WAVE_FINISH.play()
-                    return True
-                elif game_over_menu.return_to_menu:
-                    pygame.mixer.stop()
-                    return False
-            game_over_menu.click = False
         key_pressed = pygame.key.get_pressed()
-        if not char.dead:
+        if char.full_dead:
+            update_highscore(game_over_menu, wave)
+            game_over_menu.handle_buttons(float(mx), float(my))
+            if game_over_menu.retry:
+                WAVE_FINISH.play()
+                return True
+            elif game_over_menu.return_to_menu:
+                pygame.mixer.stop()
+                return False
+        elif not char.dead:
             char.move(key_pressed)
             char.update_health()
+        game_over_menu.click = False
 
         if wave.wave_commenced:
             wave.handle_enemies(char)
