@@ -45,3 +45,4 @@ Another obstacle was maintaining clean and readable code. I would find myself wo
 
 # Credits:
 Game icon credit: http://clipart-library.com/clipart/pcoAg49Ri.htm
+Main game music: Ludum Dare 38 - Track 10 By [Abstraction](http://www.abstractionmusic.com/)
