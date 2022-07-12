@@ -11,7 +11,7 @@ pygame.display.set_icon(ICON)
 FPS = 60
 # Main menu variables
 MENU_BG = pygame.image.load('Assets/menu/BG.png')
-START_BTN  = pygame.image.load('Assets/menu/Start_BTN.png')
+START_BTN = pygame.image.load('Assets/menu/Start_BTN.png')
 START_BTN_ACTIVE = pygame.image.load('Assets/menu/Start_BTN_A.png')
 EXIT_BTN = pygame.image.load('Assets/menu/Exit_BTN.png')
 EXIT_BTN_ACTIVE = pygame.image.load('Assets/menu/Exit_BTN_A.png')
@@ -217,7 +217,7 @@ class Player:
     #    An integer which tracks the last frame when this player's death
     #    animation was updated
     # _curr_death_sprite:
-    #    An integer which tracks the index of the death sprite is currently 
+    #    An integer which tracks the index of the death sprite is currently
     #    being displayed in the list of <_death_sprites>
 
     sprite: pygame.Surface
@@ -389,7 +389,6 @@ class Player:
             WINDOW.blit(LASER, (bullet.rect.x, bullet.rect.y))
             self._handle_bullets(bullet, enemies)
 
-
     def _move_arrow(self):
         self._buy_station_arrow.y += self._arrow_movement
         if self._buy_station_arrow.y == 150:
@@ -411,14 +410,14 @@ class Player:
 
         if self.need_reload:
             reload_text = FONT_SMALL.render('PRESS "R" TO RELOAD!', False, RED)
-            reload_text_w = FONT_SMALL.render('PRESS "R" TO RELOAD!', False, WHITE)
+            reload_text_w = FONT_SMALL.render('PRESS "R" TO RELOAD!', False,
+                                              WHITE)
             WINDOW.blit(reload_text_w, (WIDTH - 236, HEIGHT - 154))
             WINDOW.blit(reload_text, (WIDTH - 235, HEIGHT - 155))
         elif self.out_of_ammo:
-            out_text = FONT_SMALL.render('OUT OF AMMO! BUY MORE!', False,
-                                            RED)
+            out_text = FONT_SMALL.render('OUT OF AMMO! BUY MORE!', False, RED)
             out_text_w = FONT_SMALL.render('OUT OF AMMO! BUY MORE!', False,
-                                            WHITE)
+                                           WHITE)
             WINDOW.blit(out_text_w, (WIDTH - 286, HEIGHT - 154))
             WINDOW.blit(out_text, (WIDTH - 285, HEIGHT - 155))
             if not self.at_buy_platform:
@@ -461,7 +460,7 @@ class Player:
                 self.health -= enemy.player_damage
                 CHAR_HIT.play()
                 self._last_update_damage = now
-        
+
         if self.health <= 0:
             self.dead = True
             pygame.mixer.music.stop()
@@ -1401,18 +1400,18 @@ class Wave:
 
 class GameOver:
     """ The game over screen for this game.
-    
+
     This class handles the game over screen when the character dies.
     It handles the drawing of the menu and handling of the buttons
     and their function when they are pressed.
-    
+
     === Public Attributes ===
     retry_btn:
          The pygame rectangle representing the retry button
     menu_btn:
          The pygame rectangle representing the menu button
     click:
-         A boolean which is True when the screen is clicked and False 
+         A boolean which is True when the screen is clicked and False
          otherwise
     retry_active:
          A boolean which indicates if the cursor is hovering over the
@@ -1472,7 +1471,7 @@ class GameOver:
         and change them to a different colour if they're being hovered
         over.
         """
-        WINDOW.blit(GAME_OVER_BG, (0,0))
+        WINDOW.blit(GAME_OVER_BG, (0, 0))
         WINDOW.blit(GAME_OVER_TEXT, (WIDTH // 2 - 347, 100))
         if self.retry_active:
             WINDOW.blit(REPLAY_BTN_ACTIVE, self.retry_btn.topleft)
@@ -1492,8 +1491,8 @@ class GameOver:
             WINDOW.blit(retry_text, (x, y))
         else:
             WINDOW.blit(MAIN_MENU_BTN, self.menu_btn.topleft)
-        high_score_text = FONT.render('CURRENT HIGHSCORE: ' + str(self.high_score), 
-        False, WHITE)
+        high_score_text = FONT.render('CURRENT HIGH SCORE: ' + str(
+            self.high_score), False, YELLOW)
         WINDOW.blit(high_score_text, (450, 600))
 
     def handle_buttons(self, mx: float, my: float) -> None:
@@ -1537,7 +1536,7 @@ def _draw_window_helper(wave: Wave, char: Player) -> None:
     char.draw_ammo()
 
 
-def control_instructions():
+def control_instructions() -> None:
     """ A function which displays the controls of the game to the player
     """
     control_text1 = FONT.render('Use', False, WHITE)
@@ -1552,7 +1551,8 @@ def control_instructions():
     WINDOW.blit(control_text4, (40, 170))
 
 
-def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu: GameOver):
+def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu:
+                GameOver) -> None:
     """ This function is responsible for drawing every element of this game
     onto the screen.
     """
@@ -1584,12 +1584,11 @@ def draw_window(wave: Wave, char: Player, rotation: float, game_over_menu: GameO
     pygame.display.update()
 
 
-def update_highscore(game_over_menu: GameOver, wave: Wave):
-    """ This function adds the current wave achieved to a text file
-    containing all of the waves achieved in each game this player has
-    played. These scores are then read through and the highest one
-    is set as the highest score to be displayed in the game over
-    menu.
+def update_highscore(game_over_menu: GameOver, wave: Wave) -> None:
+    """ This function adds the current wave achieved before dying to a text file
+    containing all the highest waves achieved in each game this player has
+    played. These scores are then read through and the highest one is set as the
+    highest score to be displayed in the game over menu.
     """
     if not game_over_menu.updated_score:
         with open('Assets/misc/scores.txt', 'a') as scores:
@@ -1604,9 +1603,10 @@ def update_highscore(game_over_menu: GameOver, wave: Wave):
         game_over_menu.updated_score = True
 
 
-def _main_event_helper(event, char: Player, wave: Wave, game_over_menu: GameOver, mx: int, my: int) -> None:
+def _main_event_helper(event, char: Player, wave: Wave,
+                       game_over_menu: GameOver, mx: int, my: int) -> None:
     """ A helper function for the main() function which handles checking
-    which event is currently occuring and performing the appropriate
+    which event is currently occurring and performing the appropriate
     action.
     """
     if event.type == pygame.QUIT:
@@ -1675,7 +1675,7 @@ class MainMenu:
     This class handles the creation of the menu, the movement of the
     background images, the drawing of the menu elements, and handling
     of button presses and the functions they should perform.
-    
+
     === Public Attributes ===
     self.bg_rect:
          The pygame rectangle representing the menu background, meant
@@ -1726,7 +1726,7 @@ class MainMenu:
         self.playing = False
         self.click = False
 
-    def move_bg(self):
+    def move_bg(self) -> None:
         """ Moves the pygame rectangles representing the two
         background images upwards, following each other. When one
         background image leaves the screen, it is moved down below
@@ -1806,10 +1806,10 @@ class MainMenu:
         return True
 
 
-def main_menu():
+def main_menu() -> None:
     """ The main menu for this game. This function contains the main
     loop for the menu and calls on methods in the MainMenu class to
-    control the main menu and allow it to perform it's functions.
+    control the main menu and allow it to perform its functions.
     """
     run = True
     clock = pygame.time.Clock()
@@ -1831,6 +1831,7 @@ def main_menu():
                 if event.button == 1:
                     menu.click = True
     pygame.quit()
+
 
 if __name__ == "__main__":
     main_menu()
