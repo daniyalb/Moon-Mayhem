@@ -30,7 +30,7 @@ REPLAY_BTN_ACTIVE = pygame.image.load('Assets/game_over/Replay_BTN_A.png')
 MAIN_MENU_BTN = pygame.image.load('Assets/game_over/Menu_BTN.png')
 MAIN_MENU_BTN_A = pygame.image.load('Assets/game_over/Menu_BTN_A.png')
 # Active game variables
-BACKGROUND = pygame.image.load('Assets/misc/background.jpg')
+BACKGROUND = pygame.image.load('Assets/misc/background.png')
 BAR = pygame.image.load('Assets/misc/bar.png')
 BAR = pygame.transform.scale(BAR, (WIDTH, 50))
 HEALTH = pygame.transform.scale(pygame.image.load('Assets/misc/health_title.png'
