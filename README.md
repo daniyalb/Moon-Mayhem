@@ -2,13 +2,29 @@
 A 2D shooter game where you must fend off aliens on the moon and survive as many waves as you can. Built with the pygame module for Python.
 # Project Clips
 Main Menu:
-https://user-images.githubusercontent.com/63890998/178406975-61efbdd6-b823-4afc-96b7-e56de59c38a4.mp4
+
+
+https://user-images.githubusercontent.com/63890998/178582311-6bea2aa6-54b9-4c2c-8992-04eec77ae20f.mov
+
+
 Round 1 Example:
-https://user-images.githubusercontent.com/63890998/178407012-7b24821b-3073-44e8-9726-02b110fafaf6.mp4
-Higher Round Example + Reloading & Buying Ammo:
-https://user-images.githubusercontent.com/63890998/178407059-a50cf1cf-c2c3-4d35-9e33-927e7b2ea978.mp4
-Death Example and Game Over Screen:
-https://user-images.githubusercontent.com/63890998/178407119-2bd57aa3-dcb3-4cb3-a6d7-8ed9107586c0.mp4
+
+
+https://user-images.githubusercontent.com/63890998/178582385-f6ee5816-c49e-4e86-9dac-e64a59d7927b.mov
+
+
+Higher Round Example + Buying Ammo:
+
+
+https://user-images.githubusercontent.com/63890998/178582420-9ae2aa6f-5cc2-4365-88a5-6cc4944cba69.mov
+
+
+Game Over Screen:
+
+
+https://user-images.githubusercontent.com/63890998/178582456-18b50ad2-228c-4c70-a5d6-5f85fee8b3ed.mov
+
+
 # Installation Instructions
 1. Clone this repository to your machine
 2. Ensure that you have Python 3.9 or later installed
