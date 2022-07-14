@@ -22,7 +22,7 @@ https://user-images.githubusercontent.com/63890998/178582420-9ae2aa6f-5cc2-4365-
 Game Over Screen:
 
 
-https://user-images.githubusercontent.com/63890998/178582456-18b50ad2-228c-4c70-a5d6-5f85fee8b3ed.mov
+https://user-images.githubusercontent.com/63890998/178884501-f02a0ff2-2cb6-4586-a3b9-a39e29f58484.mp4
 
 
 # Installation Instructions
